@@ -19,7 +19,7 @@ def solve_mnist_problem():
     predictions = mlp.predict(X_test)
     predicted_digits = np.argmax(predictions, axis=1)
     
-    accuracy = np.mean(predicted_digits == y_test_labels.flatten()) * 100
+    accuracy = np.mean(predicted_digits.flatten() == y_test_labels.flatten()) * 100
     
     print(f"\nPrecisión final: {accuracy:.2f}%")
 
