@@ -1,9 +1,5 @@
 import numpy as np
-import sys
-import os
 import time
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from ej4.data_loader import load_data
 from ej4.model import create_mnist_mlp
