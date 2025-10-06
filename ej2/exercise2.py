@@ -76,8 +76,11 @@ def main():
     os.makedirs('results', exist_ok=True)
     plt.style.use('bmh')
 
+    BASE_DIR = os.path.dirname(__file__)   # carpeta actual (ej2/)
+    csv_path = os.path.join(BASE_DIR, 'TP3-ej2-conjunto.csv')
+
     # Load and prepare data
-    data = pd.read_csv('TP3-ej2-conjunto.csv')
+    data = pd.read_csv(csv_path)
     X = data[['x1', 'x2', 'x3']].values
     y = data['y'].values
 
