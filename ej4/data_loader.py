@@ -4,10 +4,10 @@ from tensorflow import keras
 def load_data(train_samples=10000, test_samples=2000):
     (x_train_full, y_train_full), (x_test_full, y_test_full) = keras.datasets.mnist.load_data()
 
-    X_train_raw = x_train_full
-    y_train_raw = y_train_full
-    X_test_raw = x_test_full
-    y_test_labels = y_test_full
+    X_train_raw = x_train_full[:train_samples]
+    y_train_raw = y_train_full[:train_samples]
+    X_test_raw = x_test_full[:test_samples]
+    y_test_labels = y_test_full[:test_samples]
 
     X_train = X_train_raw.astype('float32') / 255.0
     X_test = X_test_raw.astype('float32') / 255.0

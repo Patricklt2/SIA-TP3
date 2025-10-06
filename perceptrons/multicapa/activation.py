@@ -33,16 +33,15 @@ class Sigmoid(Activation):
         super().__init__(sigmoid, sigmoid_prime)
 
 class Softmax(Layer):
-    """Función de activación Softmax para la capa de salida."""
     def forward(self, input_data):
-        # Se resta el máximo para estabilidad numérica
-        tmp = np.exp(input_data - np.max(input_data))
-        self.output = tmp / np.sum(tmp)
+        exps = np.exp(input_data - np.max(input_data, axis=0, keepdims=True))
+        self.output = exps / np.sum(exps, axis=0, keepdims=True)
         return self.output
 
     def backward(self, output_gradient):
-        # La derivada de Softmax es compleja y usualmente se combina
-        # con la derivada de la Cross-Entropy Categórica.
-        # El gradiente que llega (output_gradient) ya está combinado.
-        # Esta es una simplificación común en la implementación.
         return output_gradient
+
+class ReLU(Activation):
+    def __init__(self):
+        super().__init__(lambda x: np.maximum(0, x),
+                         lambda x: (x > 0).astype(float))
