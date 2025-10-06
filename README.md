@@ -7,10 +7,11 @@
   - `pandas`
   - `scikit-learn`
   - `matplotlib`
+  - `tensorflow` 
 
 Instalación rápida:  
 ```bash
-pip install numpy pandas scikit-learn matplotlib
+pip install numpy pandas scikit-learn matplotlib tensorflow
 ```
 
 ---
@@ -102,3 +103,14 @@ Este script genera gráficos comparativos:
 - `optimizer_analysis.png` → rendimiento de distintos optimizadores.  
 - `learning_rate_analysis.png` → efecto de la tasa de aprendizaje con Adam.  
 
+## Ejercicio 4
+
+### Descripción
+En este ejercicio se usa el **Perceptrón Multicapa (MLP)** para clasificar dígitos del **dataset MNIST**.
+
+
+### Ejecución (desde la raíz del repo)
+
+```bash
+python -m ej4.main
+```
