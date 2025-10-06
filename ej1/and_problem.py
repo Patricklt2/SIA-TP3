@@ -1,5 +1,5 @@
 import numpy as np
-from perceptrons.simple.perceptron import Perceptron
+from perceptrons.simple.perceptron import SimplePerceptron
 
 def solve_and_problem():
     """
@@ -13,7 +13,7 @@ def solve_and_problem():
 
     # Crear y entrenar el perceptrón
     input_dim = x_and.shape[1]
-    perceptron = Perceptron(input_size=input_dim, learning_rate=0.1)
+    perceptron = SimplePerceptron(input_size=input_dim, learning_rate=0.1)
     converged = perceptron.train(x_and, y_and)
 
     # Probar el perceptrón entrenado
