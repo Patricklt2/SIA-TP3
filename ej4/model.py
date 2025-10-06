@@ -2,7 +2,7 @@ from perceptrons.multicapa.layers import Dense
 from perceptrons.multicapa.activation import Tanh, Softmax, ReLU
 from perceptrons.multicapa.mlp import MLP
 from perceptrons.multicapa.loss import cce, cce_prime
-from perceptrons.multicapa.optimizers import SGD
+from perceptrons.multicapa.optimizers import SGD, Adam, AdamW
 
 def create_mnist_mlp():
     layers = [
@@ -12,7 +12,7 @@ def create_mnist_mlp():
         Softmax()
     ]
 
-    optimizer = SGD(learning_rate=0.001)
+    optimizer = AdamW(learning_rate=0.001)
     mlp = MLP(layers, loss=cce, loss_prime=cce_prime, optimizer=optimizer)
     
     return mlp
