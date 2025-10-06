@@ -17,7 +17,7 @@ def create_mnist_mlp():
         Softmax()
     ]
 
-    optimizer = Adam(learning_rate=0.005)
+    optimizer = Adam(learning_rate=0.001)
     mlp = MLP(layers, loss=cce, loss_prime=cce_prime, optimizer=optimizer)
     
     return mlp
