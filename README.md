@@ -26,7 +26,7 @@ Se entrenan y evalúan dos funciones lógicas:
 
 El script principal (`main.py`) ejecuta ambos experimentos y muestra los resultados.
 
-## Ejecución
+### Ejecución
 
 Para correr la simulación del Ejercicio 1, asegúrate de estar en la carpeta raíz del proyecto y ejecuta el siguiente comando en tu terminal:
 
@@ -47,7 +47,7 @@ Se entrenan los modelos utilizando **validación cruzada (k-fold)** y se evalúa
 Además, se generan gráficos de curvas de aprendizaje, comparaciones de métricas y predicciones vs valores reales.
 
 
-## Ejecución
+### Ejecución
 Desde la carpeta raíz del proyecto, correr:
 
 ```bash
@@ -62,3 +62,43 @@ Esto hará lo siguiente:
    - `Learning_Curves-<activation>.png` → curvas de aprendizaje para cada activación.  
    - `Predictions_vs_True_Values-...png` → gráfico de comparación entre predicciones y valores reales.  
    - `performance_metrics.csv` → archivo resumen con métricas de cada modelo.  
+
+## Ejercicio 3
+
+### Descripción
+En este ejercicio se implementa un **Perceptrón Multicapa (MLP)** desde cero, sin librerías de deep learning, para resolver distintos problemas de clasificación:
+
+1. **Función lógica XOR** con un MLP (`xor_problem_mlp.py`).  
+2. **Discriminación de paridad**: determinar si un dígito (0–9) es par o impar (`parity_problem.py`).  
+3. **Clasificación de dígitos (0–9)**: identificar el dígito correcto y evaluar la red con ruido en los datos (`digit_classification_problem.py`).  
+4. **Análisis de hiperparámetros**: comparación de optimizadores (SGD, Momentum, Adam) y tasas de aprendizaje (`analysis_runner.py`).  
+
+Los datos se cargan desde `TP3-ej3-digitos.txt` usando utilidades en `data_utils.py`.
+
+
+### Ejecución
+
+#### 1. Función XOR con MLP
+```bash
+python -m ej3.xor_problem_mlp
+```
+
+#### 2. Discriminación de Paridad
+```bash
+python -m ej3.parity_problem
+```
+
+#### 3. Clasificación de Dígitos (0–9)
+```bash
+python -m ej3.digit_classification_problem
+```
+
+#### 4. Análisis de Hiperparámetros
+```bash
+python -m ej3.analysis_runner
+```
+
+Este script genera gráficos comparativos:
+- `optimizer_analysis.png` → rendimiento de distintos optimizadores.  
+- `learning_rate_analysis.png` → efecto de la tasa de aprendizaje con Adam.  
+
