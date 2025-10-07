@@ -1,5 +1,6 @@
 import numpy as np
 from perceptrons.simple.perceptron import SimplePerceptron
+from ej1.visualize import plot_decision_boundary
 
 def solve_and_problem():
     """
@@ -33,6 +34,7 @@ def solve_and_problem():
     else:
         print("El perceptrón NO PUDO aprender la función AND.")
     print("-" * 40)
+    plot_decision_boundary(x_and, y_and, perceptron, "Perceptrón - AND")
     return converged, accuracy
 
 if __name__ == "__main__":

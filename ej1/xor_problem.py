@@ -1,5 +1,6 @@
 import numpy as np
 from perceptrons.simple.perceptron import SimplePerceptron
+from ej1.visualize import plot_decision_boundary
 
 def solve_xor_problem():
     """
@@ -33,6 +34,7 @@ def solve_xor_problem():
     else:
         print("El perceptrón NO PUDO aprender la función XOR.")
     print("-" * 40)
+    plot_decision_boundary(x_xor, y_xor, perceptron, "Perceptrón - XOR (no linealmente separable)")
     return converged, accuracy
 
 if __name__ == "__main__":
