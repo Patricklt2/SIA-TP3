@@ -1,8 +1,14 @@
 import numpy as np
 import time
+import sys
+import os
 
-from ej4.data_loader import load_data
-from ej4.model import create_mnist_mlp
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+
+from data_loader import load_data
+from model import create_mnist_mlp
 
 def solve_mnist_problem():
     X_train, y_train, X_test, y_test_one_hot, y_test_labels = load_data(
@@ -15,6 +21,10 @@ def solve_mnist_problem():
     print("\nEmpezando el entrenamiento.")
     mlp.train(X_train, y_train, epochs=30, batch_size=32, verbose=True)
     print(f"Entrenamiento completado.")
+
+    # Save the trained model weights
+    model_path = os.path.join(os.path.dirname(__file__), 'mnist_model.npz')
+    mlp.save_weights(model_path)
 
     predictions = mlp.predict(X_test)
     predicted_digits = np.argmax(predictions, axis=1)

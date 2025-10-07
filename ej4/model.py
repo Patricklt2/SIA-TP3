@@ -1,3 +1,9 @@
+import sys
+import os
+
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from perceptrons.multicapa.layers import Dense
 from perceptrons.multicapa.activation import Tanh, Softmax, ReLU
 from perceptrons.multicapa.mlp import MLP

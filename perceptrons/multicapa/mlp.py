@@ -1,7 +1,8 @@
-# /home/pipemind/sia/SIA-TP3/perceptrons/multicapa/mlp.py
+
 import numpy as np
 from .layers import Dense
 from .loss import mse, mse_prime
+import os
 
 class MLP:
     def __init__(self, layers, loss, loss_prime, optimizer):
@@ -89,3 +90,25 @@ class MLP:
             output = self.forward(input_data[i])
             result.append(output)
         return np.array(result)
+
+    def save_weights(self, file_path):
+        """Saves the weights and biases of all dense layers to a file."""
+        weights_to_save = {}
+        for i, layer in enumerate(self.layers):
+            if isinstance(layer, Dense):
+                weights_to_save[f'weights_{i}'] = layer.weights
+                weights_to_save[f'bias_{i}'] = layer.bias
+        np.savez(file_path, **weights_to_save)
+        print(f"Model weights saved to {file_path}")
+
+    def load_weights(self, file_path):
+        """Loads weights and biases from a file into the dense layers."""
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"No weights file found at {file_path}")
+            
+        data = np.load(file_path)
+        for i, layer in enumerate(self.layers):
+            if isinstance(layer, Dense):
+                layer.weights = data[f'weights_{i}']
+                layer.bias = data[f'bias_{i}']
+        print(f"Model weights loaded from {file_path}")
