@@ -1,5 +1,5 @@
 import numpy as np
-from perceptrons.simple.perceptron import SimplePerceptron
+from perceptrons.step.perceptron import StepPerceptron
 from ej1.visualize import plot_decision_boundary
 
 def solve_xor_problem():
@@ -14,7 +14,7 @@ def solve_xor_problem():
 
     # Crear y entrenar el perceptrón
     input_dim = x_xor.shape[1]
-    perceptron = SimplePerceptron(input_size=input_dim, learning_rate=0.1)
+    perceptron = StepPerceptron(input_size=input_dim, learning_rate=0.1)
     converged = perceptron.train(x_xor, y_xor)
 
     # Probar el perceptrón entrenado

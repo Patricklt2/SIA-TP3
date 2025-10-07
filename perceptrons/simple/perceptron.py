@@ -2,75 +2,102 @@ import numpy as np
 
 class SimplePerceptron:
     """
-    Implementación de un Perceptrón simple con activación escalón.
+    Implementación de un Perceptrón con activaciones no lineales.
     """
-    def __init__(self, input_size, learning_rate=0.1):
+    def __init__(self, input_size, learning_rate=0.001, activation='tanh', beta=0.5):
         """
-        Inicializa el Perceptrón.
+        Inicializa el Perceptrón no lineal.
 
         Args:
-            input_size (int): El número de características de entrada.
-            learning_rate (float): La tasa de aprendizaje.
+            input_size (int): Número de características de entrada.
+            learning_rate (float): Tasa de aprendizaje.
+            activation (str): Tipo de activación ('tanh', 'sigmoid', 'relu', 'linear').
+            beta (float): Parámetro beta para las funciones de activación.
         """
-        self.weights = np.zeros(input_size)
-        self.bias = 0.0
+        self.weights = np.random.uniform(-1, 1, input_size)
+        self.bias = np.random.uniform(-1, 1)
         self.learning_rate = learning_rate
+        self.activation_type = activation
+        self.beta = beta
         self.errors_history = []
 
     def activation_function(self, x):
         """
-        Función de activación escalón.
-        Devuelve 1 si x >= 0, de lo contrario -1.
+        Aplica la función de activación seleccionada.
         """
-        return np.where(x >= 0, 1, -1)  # Changed to handle numpy arrays
+        if self.activation_type == 'linear':
+            return x
+        elif self.activation_type == 'tanh':
+            return np.tanh(self.beta * x)
+        elif self.activation_type == 'sigmoid':
+            return 1 / (1 + np.exp(-self.beta * x))
+        elif self.activation_type == 'relu':
+            return np.maximum(0, x)
+        return x
+
+    def activation_derivative(self, x):
+        """
+        Calcula la derivada de la función de activación.
+        """
+        if self.activation_type == 'linear':
+            return np.ones_like(x)
+        elif self.activation_type == 'tanh':
+            return self.beta * (1 - np.tanh(self.beta * x)**2)
+        elif self.activation_type == 'sigmoid':
+            sig = 1 / (1 + np.exp(-self.beta * x))
+            return self.beta * sig * (1 - sig)
+        elif self.activation_type == 'relu':
+            return np.where(x > 0, 1, 0)
+        return 1
 
     def predict(self, inputs):
         """
-        Predice la salida para un conjunto de entradas.
+        Realiza una predicción para las entradas dadas.
         """
-        if inputs.ndim == 1:
-            inputs = inputs.reshape(1, -1)
         summation = np.dot(inputs, self.weights) + self.bias
         return self.activation_function(summation)
 
-    def train(self, training_inputs, labels, epochs=100, verbose=True):
+    def train(self, training_inputs, labels, epochs=1000, verbose=True):
         """
-        Entrena el perceptrón.
+        Entrena el perceptrón no lineal.
 
         Args:
-            training_inputs (np.array): Array de numpy con los datos de entrenamiento.
-            labels (np.array): Array de numpy con las etiquetas esperadas.
-            epochs (int): Número máximo de iteraciones sobre los datos.
-            verbose (bool): Si es True, imprime el progreso del entrenamiento.
+            training_inputs (np.array): Datos de entrenamiento.
+            labels (np.array): Etiquetas esperadas.
+            epochs (int): Número máximo de épocas.
+            verbose (bool): Si es True, imprime el progreso.
 
         Returns:
-            bool: True si el perceptrón convergió, False en caso contrario.
+            bool: True si convergió, False en caso contrario.
         """
         self.errors_history = []
         
         if verbose:
-            print("Entrenando el perceptrón...")
+            print(f"Entrenando perceptrón no lineal ({self.activation_type})...")
             
         for epoch in range(epochs):
-            errors = 0
+            total_error = 0
             for inputs, label in zip(training_inputs, labels):
-                prediction = self.predict(inputs)[0]  # Get scalar prediction
-                if prediction != label:
-                    errors += 1
-                    update = self.learning_rate * (label - prediction)
-                    self.weights += update * inputs
-                    self.bias += update
-                    
-            self.errors_history.append(errors)
-            
-            if verbose:
-                print(f"Época {epoch + 1}/{epochs} - Errores: {errors}")
+                prediction = self.predict(inputs)
+                error = label - prediction
+                total_error += error**2
                 
-            if errors == 0:
+                # Actualización usando gradiente descendente
+                delta = error * self.activation_derivative(np.dot(inputs, self.weights) + self.bias)
+                self.weights += self.learning_rate * delta * inputs
+                self.bias += self.learning_rate * delta
+                
+            mse = total_error / len(training_inputs)
+            self.errors_history.append(mse)
+            
+            if verbose and epoch % 100 == 0:
+                print(f"Época {epoch}/{epochs} - MSE: {mse:.6f}")
+                
+            if mse < 0.0001:
                 if verbose:
-                    print("El perceptrón ha convergido.")
+                    print("Convergencia alcanzada.")
                 return True
                 
         if verbose:
-            print("El perceptrón no convergió en el número de épocas dado.")
+            print("No se alcanzó la convergencia deseada.")
         return False

@@ -6,7 +6,6 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, r2_score
 import matplotlib.pyplot as plt
 from perceptrons.simple.perceptron import SimplePerceptron
-from perceptrons.nonlinear.perceptron import NonLinearPerceptron
 
 BASE_DIR = os.path.dirname(__file__)
 RESULTS_PATH = os.path.join(BASE_DIR, 'results')
@@ -119,15 +118,13 @@ def main():
                 y_train, y_test = y_scaled[train_idx], y_scaled[test_idx]
 
                 # Create appropriate perceptron based on activation type
-                if act_name == 'Linear':
-                    model = SimplePerceptron(input_size=X.shape[1], learning_rate=0.001)
-                else:
-                    model = NonLinearPerceptron(
-                        input_size=X.shape[1],
-                        learning_rate=0.001,
-                        activation=act_name.lower(),
-                        beta=beta
-                    )
+            
+                model = SimplePerceptron(
+                    input_size=X.shape[1],
+                    learning_rate=0.001,
+                    activation=act_name.lower(),
+                    beta=beta
+                )
 
                 # Train the model
                 model.train(X_train, y_train, epochs=1000, verbose=False)
