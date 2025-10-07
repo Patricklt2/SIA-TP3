@@ -11,9 +11,12 @@ from data_loader import load_data
 from model import create_mnist_mlp
 
 def solve_mnist_problem():
+  
     X_train, y_train, X_test, y_test_one_hot, y_test_labels = load_data(
-        train_samples=10000,
+        train_samples=10000, #mas rapido menos accurate
         test_samples=2000
+       # train_samples=60000, # Use all available training samples
+        # test_samples=10000   # Use all available test samples
     )
 
     mlp = create_mnist_mlp()
@@ -22,7 +25,7 @@ def solve_mnist_problem():
     mlp.train(X_train, y_train, epochs=30, batch_size=32, verbose=True)
     print(f"Entrenamiento completado.")
 
-    # Save the trained model weights
+   
     model_path = os.path.join(os.path.dirname(__file__), 'mnist_model.npz')
     mlp.save_weights(model_path)
 

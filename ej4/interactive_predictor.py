@@ -15,9 +15,11 @@ class DigitDrawer(tk.Tk):
         super().__init__()
         self.title("MNIST Interactive Predictor")
         self.model = model
-        self.canvas_width = 280
-        self.canvas_height = 280
-        self.pen_width = 20
+       
+        self.canvas_width = 560
+        self.canvas_height = 560
+       
+        self.pen_width = 8
 
         self.canvas = tk.Canvas(self, width=self.canvas_width, height=self.canvas_height, bg="black", cursor="cross")
         self.canvas.pack(pady=10, padx=10)
