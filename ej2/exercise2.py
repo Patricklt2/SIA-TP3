@@ -1,11 +1,15 @@
 import numpy as np
 import pandas as pd
+import os 
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, r2_score
 import matplotlib.pyplot as plt
 from perceptrons.simple.perceptron import SimplePerceptron
 from perceptrons.nonlinear.perceptron import NonLinearPerceptron
+
+BASE_DIR = os.path.dirname(__file__)
+RESULTS_PATH = os.path.join(BASE_DIR, 'results')
 
 def plot_learning_curves(models_history, title):
     plt.figure(figsize=(12, 6))
@@ -16,7 +20,8 @@ def plot_learning_curves(models_history, title):
     plt.ylabel('MSE')
     plt.legend()
     plt.grid(True)
-    plt.savefig(f'results/{title.replace(" ", "_")}.png')
+    path = os.path.join(RESULTS_PATH, f'{title.replace(" ", "_")}.png')
+    plt.savefig(path)
 
 def plot_metrics_comparison(results):
     metrics = ['MSE', 'MAE', 'R2']
@@ -50,7 +55,8 @@ def plot_metrics_comparison(results):
     plt.ylim(0, 1)  # Force y-axis to be 0-1
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.tight_layout()
-    plt.savefig('results/metrics_comparison.png')
+    path = os.path.join(RESULTS_PATH, 'metrics_comparison.png')
+    plt.savefig(path)
 
 def plot_predictions_vs_true(X, y, model, scaler_y, title):
     y_pred = model.predict(X)
@@ -68,15 +74,14 @@ def plot_predictions_vs_true(X, y, model, scaler_y, title):
         ax.legend()
     
     plt.tight_layout()
-    plt.savefig(f'results/{title.replace(" ", "_")}.png')
+    path = os.path.join(RESULTS_PATH, f'{title.replace(" ", "_")}.png')
+    plt.savefig(path)
 
 def main():
     # Create results directory
-    import os
-    os.makedirs('results', exist_ok=True)
+    os.makedirs(RESULTS_PATH, exist_ok=True)
     plt.style.use('bmh')
 
-    BASE_DIR = os.path.dirname(__file__)   # carpeta actual (ej2/)
     csv_path = os.path.join(BASE_DIR, 'TP3-ej2-conjunto.csv')
 
     # Load and prepare data
@@ -170,7 +175,8 @@ def main():
         'MAE Mean': [v['mae_mean'] for v in results.values()],
         'R2 Mean': [v['r2_mean'] for v in results.values()]
     })
-    results_df.to_csv('results/performance_metrics.csv', index=False)
+    path_metrics = os.path.join(RESULTS_PATH, 'performance_metrics.csv')
+    results_df.to_csv(path_metrics, index=False)
 
     plt.show()
 
