@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 
 class SimplePerceptron:
     """
@@ -19,7 +20,9 @@ class SimplePerceptron:
         self.learning_rate = learning_rate
         self.activation_type = activation
         self.beta = beta
-        self.errors_history = []
+        self.errors_history_scaled = []
+        self.errors_history_real = []
+        self._yscaler = None
 
     def activation_function(self, x):
         """
@@ -55,9 +58,19 @@ class SimplePerceptron:
         Realiza una predicción para las entradas dadas.
         """
         summation = np.dot(inputs, self.weights) + self.bias
-        return self.activation_function(summation)
+        out = self.activation_function(summation)
+        if self._yscaler is not None:
+            out = self._yscaler.inverse_transform(out.reshape(-1,1)).ravel()
+        return out
+    
+    def _range_for_act(self):
+        if self.activation_type == "sigmoid":
+            return (0, 1)
+        if self.activation_type == "tanh":
+            return (-1, 1)
+        return None  # lineal -> no escalo
 
-    def train(self, training_inputs, labels, epochs=1000, verbose=True):
+    def train(self, training_inputs, y, epochs=1000, verbose=True):
         """
         Entrena el perceptrón no lineal.
 
@@ -70,26 +83,49 @@ class SimplePerceptron:
         Returns:
             bool: True si convergió, False en caso contrario.
         """
-        self.errors_history = []
+        self.errors_history_scaled = []
+        self.errors_history_real = []
         
         if verbose:
             print(f"Entrenando perceptrón no lineal ({self.activation_type})...")
-            
+
+        y_orig = np.asarray(y).ravel()
+
+        # Escalado de y si corresponde
+        rng = self._range_for_act()
+        if rng is not None:
+            self._yscaler = MinMaxScaler(feature_range=rng)
+            y_scaled = self._yscaler.fit_transform(y_orig.reshape(-1, 1)).ravel()
+        else:
+            self._yscaler = None
+            y_scaled = y_orig  # sin escalado
+        
         for epoch in range(epochs):
             total_error = 0
-            for inputs, label in zip(training_inputs, labels):
-                prediction = self.predict(inputs)
+            total_error_real = 0
+            for inputs, label, label_real in zip(training_inputs, y_scaled, y_orig):
+                summation = np.dot(inputs, self.weights) + self.bias
+                prediction = self.activation_function(summation)
                 error = label - prediction
                 total_error += error**2
+                if(rng is not None):
+                    error_real = label_real - self._yscaler.inverse_transform(prediction.reshape(-1,1)).ravel()
+                    total_error_real += error_real**2
                 
                 # Actualización usando gradiente descendente
                 delta = error * self.activation_derivative(np.dot(inputs, self.weights) + self.bias)
                 self.weights += self.learning_rate * delta * inputs
                 self.bias += self.learning_rate * delta
                 
-            mse = total_error / len(training_inputs)
-            self.errors_history.append(mse)
+            mse = float(total_error / len(training_inputs))
+            self.errors_history_scaled.append(mse)
             
+            if(rng is not None):
+                mse_real = float(total_error_real / len(training_inputs))
+                self.errors_history_real.append(mse_real)
+            else:
+                self.errors_history_real.append(mse)
+
             if verbose and epoch % 100 == 0:
                 print(f"Época {epoch}/{epochs} - MSE: {mse:.6f}")
                 

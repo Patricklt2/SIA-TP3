@@ -211,4 +211,4 @@ __marimo__/
 **/*.png
 
 # Ignorar archivos CSV
-ej2/results/*.csv
+ej2/results/compare/*.csv

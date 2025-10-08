@@ -55,6 +55,15 @@ Desde la carpeta raíz del proyecto, correr:
 python -m ej2.exercise2
 ```
 
+```bash
+python -m ej2.compare_activations -c ej2/base.json 
+```
+
+```bash
+python -m ej2.plot_comparisons -c ej2/base.json --results_dir ej2/results/compare --out_dir ej2/
+results/plots 
+```
+
 Esto hará lo siguiente:
 1. Leer el dataset `TP3-ej2-conjunto.csv`.  
 2. Entrenar perceptrones lineales y no lineales con distintas configuraciones de hiperparámetros (`beta`).  
