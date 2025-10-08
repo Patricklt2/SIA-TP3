@@ -5,6 +5,7 @@ import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter, LogFormatterSciNotation
 
 from sklearn.metrics import r2_score
 from sklearn.model_selection import KFold
@@ -113,74 +114,221 @@ def build_train_summary(all_df, base_dir):
         })
     return pd.DataFrame(rows)
 
+# ---------------- GRÁFICO DE BARRAS COMPARATIVO ----------------
+def plot_comparative_bar_chart(bests_df, out_dir):
+    """
+    Gráfico de barras comparando los mejores modelos de cada función de activación
+    con sus barras de error.
+    """
+    if bests_df.empty:
+        print("[WARN] No hay datos para el gráfico de barras comparativo")
+        return
+    
+    # Colores para cada función de activación
+    colors = {"linear": "#7C3AED", "tanh": "#16A34A", "sigmoid": "#F59E0B"}
+    
+    # Preparar datos
+    activations = []
+    means = []
+    stds = []
+    colors_plot = []
+    
+    for _, row in bests_df.iterrows():
+        act = str(row["activation"]).upper()
+        activations.append(act)
+        means.append(row["mse_train_mean"])
+        stds.append(row["mse_train_std"])
+        colors_plot.append(colors.get(str(row["activation"]).lower(), "#666666"))
+    
+    # Crear gráfico
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Gráfico de barras con errores
+    bars = ax.bar(activations, means, yerr=stds, capsize=8, 
+                  color=colors_plot, alpha=0.8, edgecolor='black', linewidth=1.2)
+    
+    # Añadir valores encima de las barras
+    for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.01 * max(means),
+                f'{mean:.4f}\n±{std:.4f}', 
+                ha='center', va='bottom', fontsize=10, fontweight='bold',
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
+    
+    # Configuraciones del gráfico
+    ax.set_title('Comparación de Mejores Modelos por Función de Activación', 
+                 fontsize=14, fontweight='bold', pad=20)
+    ax.set_ylabel('MSE Train Promedio', fontsize=12)
+    ax.set_xlabel('Función de Activación', fontsize=12)
+    
+    # Mejorar el grid
+    ax.grid(True, alpha=0.3, axis='y', linestyle='--')
+    ax.set_axisbelow(True)
+    
+    # Ajustar límites del eje Y para mejor visualización
+    y_max = max(means) + max(stds) + 0.1 * max(means)
+    ax.set_ylim(0, y_max)
+    
+    # Añadir información adicional en el gráfico
+    best_idx = np.argmin(means)
+    best_act = activations[best_idx]
+    best_value = means[best_idx]
+    
+    ax.text(0.02, 0.98, f'Mejor modelo: {best_act} (MSE = {best_value:.4f})', 
+            transform=ax.transAxes, fontsize=11, fontweight='bold',
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgreen", alpha=0.8),
+            verticalalignment='top')
+    
+    plt.tight_layout()
+    
+    # Guardar
+    path = os.path.join(out_dir, "comparative_best_models_bar.png")
+    fig.savefig(path, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    print("[saved]", path)
+
 # ---------------- curvas de comparación (TRAIN) ----------------
 def plot_betas_train(train_df, out_dir, act):
-    sub_beta = train_df[(train_df["activation"] == act) & (train_df["phase"] == "beta")]
-    if sub_beta.empty:
+    sub = train_df[(train_df["activation"] == act) & (train_df["phase"] == "beta")].copy()
+    if sub.empty:
         return
-    g = sub_beta.groupby("beta", as_index=False)[["mse_train_mean"]].agg(["mean","std"]).reset_index()
-    betas = g["beta"].values
-    means = g[("mse_train_mean","mean")].values
-    stds  = g[("mse_train_mean","std")].fillna(0.0).values
+
+    betas = sub["beta"].to_numpy(float)
+    means = sub["mse_train_mean"].to_numpy(float)
+    stds  = sub["mse_train_std"].fillna(0.0).to_numpy(float)
+
     order = np.argsort(betas)
     betas, means, stds = betas[order], means[order], stds[order]
 
-    plt.figure(figsize=(7,5))
-    plt.errorbar(betas, means, yerr=stds, fmt='-o', capsize=5)
+    color = "#2563EB"
+    fig, ax = plt.subplots(figsize=(7,5))
+
+    # Verificar si necesitamos escala logarítmica en Y
+    ymin, ymax = np.nanmin(means - stds), np.nanmax(means + stds)
+    use_log_y = ymax / max(ymin, 1e-12) > 50
+    
+    if use_log_y:
+        # En escala logarítmica, las barras de error deben ser asimétricas
+        yerr_lower = np.where(means - stds > 0, means - (means - stds), means * 0.1)
+        yerr_upper = means + stds - means
+        yerr = [yerr_lower, yerr_upper]
+    else:
+        yerr = stds
+
+    # Barras de error
+    ax.errorbar(
+        betas, means, yerr=yerr,
+        fmt='o-', color=color, ecolor=color,
+        elinewidth=2.2, capsize=6, capthick=2,
+        linewidth=2.4, markersize=7,
+        markerfacecolor="white", markeredgecolor=color, markeredgewidth=1.6
+    )
+
+    # marcar mínimo - SUBIR MÁS LA ETIQUETA
     i = int(np.argmin(means))
-    plt.scatter([betas[i]], [means[i]], marker='*', s=180, zorder=5)
-    plt.title(f"{act.upper()}: MSE_train vs β")
-    plt.xlabel("β"); plt.ylabel("MSE_train promedio (±1σ)")
-    plt.grid(True, alpha=0.4); plt.tight_layout()
+    ax.scatter([betas[i]], [means[i]], marker='*', s=200, color=color, zorder=5)
+    
+    # Calcular posición vertical de la etiqueta
+    if use_log_y:
+        label_y_pos = means[i] * 1.8  # Multiplicador mayor para escala log
+    else:
+        data_range = np.nanmax(means) - np.nanmin(means)
+        label_y_pos = means[i] + 0.25 * data_range  # Offset más grande
+    
+    ax.text(betas[i], label_y_pos, f"{means[i]:.4f}", 
+            color=color, ha="center", fontsize=10, fontweight='bold',
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+
+    if use_log_y:
+        ax.set_yscale("log")
+
+    ax.set_title(f"{act.upper()}: MSE_train vs β")
+    ax.set_xlabel("β")
+    ax.set_ylabel("MSE_train promedio (±1σ)")
+    ax.grid(True, alpha=0.35, linestyle=":")
+    fig.tight_layout()
     path = os.path.join(out_dir, f"{act}_mse_train_vs_beta.png")
-    plt.savefig(path, dpi=150); plt.close()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
     print("[saved]", path)
 
 def plot_lrs_train(train_df, out_dir, act):
     if act in ("tanh","sigmoid"):
-        sub_lr = train_df[(train_df["activation"] == act) & (train_df["phase"] == "lr")]
+        sub = train_df[(train_df["activation"] == act) & (train_df["phase"] == "lr")].copy()
     else:
-        sub_lr = train_df[(train_df["activation"] == act)]
-    if sub_lr.empty:
+        sub = train_df[(train_df["activation"] == act)].copy()
+    if sub.empty:
         return
-    g = sub_lr.groupby("learning_rate", as_index=False)[["mse_train_mean"]].agg(["mean","std"]).reset_index()
-    lrs   = g["learning_rate"].values
-    order = np.argsort(lrs)
-    means = g[("mse_train_mean","mean")].values[order]
-    stds  = g[("mse_train_mean","std")].fillna(0.0).values[order]
 
-    plt.figure(figsize=(7,5))
-    plt.errorbar(lrs[order], means, yerr=stds, fmt='-o', capsize=5)
+    lrs   = sub["learning_rate"].to_numpy(float)
+    means = sub["mse_train_mean"].to_numpy(float)
+    stds  = sub["mse_train_std"].fillna(0.0).to_numpy(float)
+
+    order = np.argsort(lrs)
+    lrs, means, stds = lrs[order], means[order], stds[order]
+
+    color_map = {"linear": "#7C3AED", "tanh": "#16A34A", "sigmoid": "#F59E0B"}
+    color = color_map.get(act, "#111827")
+
+    fig, ax = plt.subplots(figsize=(7,5))
+
+    # Verificar si necesitamos escala logarítmica en Y
+    ymin, ymax = np.nanmin(means - stds), np.nanmax(means + stds)
+    use_log_y = ymax / max(ymin, 1e-12) > 50
+    
+    if use_log_y:
+        # En escala logarítmica, las barras de error deben ser asimétricas
+        yerr_lower = np.where(means - stds > 0, means - (means - stds), means * 0.1)
+        yerr_upper = means + stds - means
+        yerr = [yerr_lower, yerr_upper]
+    else:
+        yerr = stds
+
+    # Barras de error
+    ax.errorbar(
+        lrs, means, yerr=yerr,
+        fmt='o-', color=color, ecolor=color,
+        elinewidth=2.2, capsize=6, capthick=2,
+        linewidth=2.4, markersize=7,
+        markerfacecolor="white", markeredgecolor=color, markeredgewidth=1.6
+    )
+
+    # marcar mínimo - SUBIR MÁS LA ETIQUETA
     i = int(np.argmin(means))
-    plt.scatter([lrs[order][i]], [means[i]], marker='*', s=180, zorder=5)
+    ax.scatter([lrs[i]], [means[i]], marker='*', s=200, color=color, zorder=5)
+    
+    # Calcular posición vertical de la etiqueta
+    if use_log_y:
+        label_y_pos = means[i] * 2.0  # Multiplicador mayor para escala log
+    else:
+        data_range = np.nanmax(means) - np.nanmin(means)
+        label_y_pos = means[i] + 0.3 * data_range  # Offset más grande
+    
+    ax.text(lrs[i], label_y_pos, f"{means[i]:.4f}", 
+            color=color, ha="center", fontsize=10, fontweight='bold',
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+
+    # escala log en X con notación científica
+    ax.set_xscale("log")
+    ax.xaxis.set_major_formatter(LogFormatterSciNotation())
+    
+    if use_log_y:
+        ax.set_yscale("log")
+
+    ax.grid(True, alpha=0.35, linestyle=":", which="both")
+
     ttl = f"{act.upper()}: MSE_train vs learning rate"
     if act in ("tanh","sigmoid"):
         ttl += " (β*)"
-    plt.title(ttl); plt.xlabel("learning rate"); plt.xscale("log")
-    plt.ylabel("MSE_train promedio (±1σ)")
-    plt.grid(True, alpha=0.4, which="both"); plt.tight_layout()
+    ax.set_title(ttl)
+    ax.set_xlabel("Learning rate")
+    ax.set_ylabel("MSE_train promedio (±1σ)")
+
+    fig.tight_layout()
     path = os.path.join(out_dir, f"{act}_mse_train_vs_lr.png")
-    plt.savefig(path, dpi=150); plt.close()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
     print("[saved]", path)
-
-# ---------------- reconstrucción para scatter / historia ----------------
-def _range_for_act(act):
-    if act == "sigmoid": return (0,1)
-    if act == "tanh":    return (-1,1)
-    return None
-
-def _rebuild_split_and_scalers(dataset, target, kfolds, test_fold, shuffle, seed_base):
-    df = pd.read_csv(dataset)
-    y_raw = df[target].values.astype(float)
-    X_raw = df[[c for c in df.columns if c != target]].values.astype(float)
-    kf = KFold(n_splits=int(kfolds), shuffle=bool(shuffle), random_state=int(seed_base))
-    tr_idx, te_idx = list(kf.split(X_raw))[int(test_fold)-1]
-    Xtr_raw, Xte_raw = X_raw[tr_idx], X_raw[te_idx]
-    ytr_raw, yte_raw = y_raw[tr_idx], y_raw[te_idx]
-    xsc = MinMaxScaler(feature_range=(-1,1))
-    Xtr = xsc.fit_transform(Xtr_raw)
-    Xte = xsc.transform(Xte_raw)
-    return Xtr, Xte, ytr_raw, yte_raw
 
 def _extract_history_real(row):
     for key in row.index:
@@ -198,46 +346,6 @@ def _extract_history_real(row):
             return out
     return None
 
-def _predict_from_rep_row(rep_row, dataset, target):
-    act   = str(rep_row["activation"]).lower()
-    beta  = float(rep_row.get("beta", 1.0)) if not pd.isna(rep_row.get("beta", np.nan)) else 1.0
-    lr    = float(rep_row.get("learning_rate", 0.01))
-    kf    = int(rep_row["kfolds"]); tf = int(rep_row["test_fold"])
-    shuf  = bool(rep_row["shuffle"]); seed = int(rep_row["seed_base"])
-
-    Xtr, Xte, ytr_raw, yte_raw = _rebuild_split_and_scalers(dataset, target, kf, tf, shuf, seed)
-
-    rng = _range_for_act(act)
-    ysc = None
-    if rng is not None:
-        ysc = MinMaxScaler(feature_range=rng)
-        ysc.fit(ytr_raw.reshape(-1,1))
-
-    # reconstruir pesos
-    w_cols = sorted([c for c in rep_row.index if str(c).startswith("w_")],
-                    key=lambda c: int(str(c).split("_")[1]))
-    weights = np.array([float(rep_row[c]) for c in w_cols], dtype=float)
-    bias    = float(rep_row["bias"])
-
-    model = SimplePerceptron(input_size=Xtr.shape[1], learning_rate=lr, activation=act, beta=beta)
-    model.weights = weights.copy()
-    model.bias    = bias
-    model._yscaler = ysc
-
-    y_pred = model.predict(Xte)
-    return yte_raw, np.asarray(y_pred).ravel()
-
-def plot_ytrue_vs_ypred(y_true, y_pred, title, out_path):
-    r2 = r2_score(y_true, y_pred)
-    plt.figure(figsize=(6,6))
-    plt.scatter(y_true, y_pred, s=18, alpha=0.9, label=f"Predicciones (R²={r2:.3f})")
-    y_min, y_max = min(np.min(y_true), np.min(y_pred)), max(np.max(y_true), np.max(y_pred))
-    xs = np.linspace(y_min, y_max, 100)
-    plt.plot(xs, xs, "k--", lw=2, label="y = x")
-    plt.xlabel("y real"); plt.ylabel("y predicha"); plt.title(title)
-    plt.legend(); plt.grid(True, linestyle=":", alpha=0.6)
-    plt.savefig(out_path, dpi=150, bbox_inches="tight"); plt.close()
-    print("[saved]", out_path)
 
 # ---------------- main ----------------
 def main():
@@ -284,7 +392,10 @@ def main():
         bests.append(train_df.loc[idx])
     bests = pd.DataFrame(bests)
 
-        # --- Graficar todas las historias de MSE(real) juntas ---
+    # 4) NUEVO: Gráfico de barras comparativo
+    plot_comparative_bar_chart(bests, args.out_dir)
+
+    # 5) Graficar todas las historias de MSE(real) juntas
     plt.figure(figsize=(8,6))
     colors = {"linear": "purple", "tanh": "green", "sigmoid": "orange"}
     legends = []
@@ -309,12 +420,17 @@ def main():
 
         epochs = np.arange(1, len(hist)+1)
         plt.plot(epochs, hist, "-", linewidth=2, label=act.upper(),
-                 color=colors.get(act, None), alpha=0.9)
+                color=colors.get(act, None), alpha=0.9)
 
         # marcar último valor
-        plt.text(epochs[-1], hist[-1], f"{hist[-1]:.3f}",
-                 fontsize=9, color=colors.get(act, "black"),
-                 va="center", ha="left")
+        y_pos = hist[-1]
+        # Mover la etiqueta de sigmoid hacia arriba para evitar superposición
+        if act == "sigmoid":
+            y_pos = hist[-1] * 1.5  # Aumenté el multiplicador
+        
+        plt.text(epochs[-1], y_pos, f"{hist[-1]:.3f}",
+                fontsize=9, color=colors.get(act, "black"),
+                va="center", ha="left")
 
     plt.yscale("log")
     plt.title("Evolución del MSE (real) — Mejores modelos por función")

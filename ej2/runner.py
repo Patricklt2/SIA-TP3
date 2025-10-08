@@ -73,11 +73,10 @@ def run(cfg):
         model.train(X_train, y_train, epochs=epochs, verbose=False)
 
         # predicciones en ESCALA REAL (el modelo ya desescala si corresponde)
-        y_hat_train = model.predict(X_train)
         y_hat_test  = model.predict(X_test)
 
         # métricas en escala real
-        mse_tr, mae_tr, r2_tr = evaluate_real(y_hat_train, y_train)
+        mse_tr= model.errors_history_real[-1]
         mse_te, mae_te, r2_te = evaluate_real(y_hat_test,  y_test)
 
 
@@ -94,8 +93,6 @@ def run(cfg):
             "seed_used": seed,
             "test_fold": test_fold,
             "mse_train": mse_tr,
-            "mae_train": mae_tr,
-            "r2_train": r2_tr,
             "mse_test": mse_te,
             "mae_test": mae_te,
             "r2_test": r2_te,
