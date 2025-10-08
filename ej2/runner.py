@@ -40,7 +40,10 @@ def run(cfg):
     out_csv     = cfg.get("output_csv", "results/fold_run_sp.csv")
 
     # --- folds ---
-    kf = KFold(n_splits=kfolds, shuffle=shuffle, random_state=seed_base)
+    if(shuffle):
+        kf = KFold(n_splits=kfolds, shuffle=shuffle, random_state=seed_base)
+    else:
+        kf = KFold(n_splits=kfolds, shuffle=shuffle)
     folds = list(kf.split(X_raw))
 
     if not (1 <= test_fold <= kfolds):

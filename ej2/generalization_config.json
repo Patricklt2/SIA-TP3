@@ -1,0 +1,10 @@
+{
+  "dataset": "ej2/TP3-ej2-conjunto.csv",
+  "target": "y",
+  "activation": "tanh",        
+  "beta": 1.5,                
+  "learning_rate": 0.01,
+  "epochs": 1000,
+  "shuffle": false,
+  "seed": 1234
+}
