@@ -64,6 +64,18 @@ python -m ej2.plot_comparisons -c ej2/base.json --results_dir ej2/results/compar
 results/plots 
 ```
 
+```bash
+python -m ej2.analyze_generalization --results_dir ej2/results/generalization  
+```
+
+```bash
+python ej2/plot_generalize.py --summary ej2/results/generalization/generalization_summary.json 
+```
+
+```bash
+python ej2/plot_folds.py --summary ej2/results/generalization/generalization_summary.json  
+```
+
 Esto hará lo siguiente:
 1. Leer el dataset `TP3-ej2-conjunto.csv`.  
 2. Entrenar perceptrones lineales y no lineales con distintas configuraciones de hiperparámetros (`beta`).  
