@@ -8,7 +8,7 @@ import sys
 # Add the project root to the Python path to find the 'perceptrons' module
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from model import create_mnist_mlp
+from ej4.model import create_mnist_mlp
 
 class DigitDrawer(tk.Tk):
     def __init__(self, model):

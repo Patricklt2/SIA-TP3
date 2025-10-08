@@ -12,13 +12,15 @@ from perceptrons.multicapa.optimizers import SGD, Adam, AdamW
 
 def create_mnist_mlp():
     layers = [
-        Dense(input_size=28*28, output_size=128),
+        Dense(784, 256),
         ReLU(),
-        Dense(input_size=128, output_size=10),
+        Dense(256, 64),
+        ReLU(),
+        Dense(64, 10),
         Softmax()
     ]
 
-    optimizer = AdamW(learning_rate=0.002)
+    optimizer = AdamW(learning_rate=0.0015)
     mlp = MLP(layers, loss=cce, loss_prime=cce_prime, optimizer=optimizer)
     
     return mlp
