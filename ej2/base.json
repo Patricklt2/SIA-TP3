@@ -2,10 +2,9 @@
   "dataset": "ej2/TP3-ej2-conjunto.csv",
   "target": "y",
   "kfolds": 4,
-  "test_fold": 2,
-  "shuffle": true,
+  "test_fold": 1,
+  "shuffle": false,
   "epochs": 1000,
   "learning_rate": 0.01,
-  "beta": 1.0,
-  "seed": 1234
+  "beta": 1.0
 }

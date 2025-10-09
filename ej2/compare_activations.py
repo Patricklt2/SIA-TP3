@@ -5,7 +5,7 @@ import pandas as pd
 from ej2.runner import run  # tu runner con run(cfg)
 
 # barrido
-DEF_BETAS = [0.2, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+DEF_BETAS = [0.2, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
 DEF_LRS   = [1e-4, 1e-3, 1e-2, 1e-1, 1, 10]      # para tanh/sigmoid (fase LR)
 DEF_LRS_LINEAL = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]  # para linear
 

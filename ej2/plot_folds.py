@@ -228,9 +228,9 @@ def plot_all_folds_features_boxplot(fold_data, fold_sweep_csv, out_dir, activati
         positions_test = np.arange(len(feature_names)) + 0.2
         
         box1 = ax1.boxplot(train_data_features, positions=positions_train, widths=0.3, 
-                          patch_artist=True, labels=feature_names)
+                          patch_artist=True, tick_labels=feature_names)
         box2 = ax1.boxplot(test_data_features, positions=positions_test, widths=0.3, 
-                          patch_artist=True, labels=feature_names)
+                          patch_artist=True, tick_labels=feature_names)
         
         # Colorear los boxplots
         for box in box1['boxes']:
@@ -275,7 +275,7 @@ def plot_all_folds_features_boxplot(fold_data, fold_sweep_csv, out_dir, activati
         positions_target = [-0.2, 0.2]
         
         box_target = ax2.boxplot(target_data, positions=positions_target, widths=0.3, 
-                                patch_artist=True, labels=['Train', 'Test'])
+                                patch_artist=True, tick_labels=['Train', 'Test'])
         
         # Colorear los boxplots del target
         colors_target = ['lightgreen', 'orange']

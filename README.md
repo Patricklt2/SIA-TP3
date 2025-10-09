@@ -52,20 +52,15 @@ Además, se generan gráficos de curvas de aprendizaje, comparaciones de métric
 Desde la carpeta raíz del proyecto, correr:
 
 ```bash
-python -m ej2.exercise2
-```
-
-```bash
 python -m ej2.compare_activations -c ej2/base.json 
 ```
 
 ```bash
-python -m ej2.plot_comparisons -c ej2/base.json --results_dir ej2/results/compare --out_dir ej2/
-results/plots 
+python -m ej2.plot_comparisons -c ej2/base.json --results_dir ej2/results/compare --out_dir ej2/results/plots 
 ```
 
 ```bash
-python -m ej2.analyze_generalization --results_dir ej2/results/generalization  
+python -m ej2.generalization_study -c ej2/generalization_config.json --ks 3,4,5,6,8,10 --reps 5 --results_dir ej2/results/generalization 
 ```
 
 ```bash

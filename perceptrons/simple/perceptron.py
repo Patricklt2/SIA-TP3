@@ -73,15 +73,6 @@ class SimplePerceptron:
     def train(self, training_inputs, y, epochs=1000, verbose=True):
         """
         Entrena el perceptrón no lineal.
-
-        Args:
-            training_inputs (np.array): Datos de entrenamiento.
-            labels (np.array): Etiquetas esperadas.
-            epochs (int): Número máximo de épocas.
-            verbose (bool): Si es True, imprime el progreso.
-
-        Returns:
-            bool: True si convergió, False en caso contrario.
         """
         self.errors_history_scaled = []
         self.errors_history_real = []
@@ -98,29 +89,39 @@ class SimplePerceptron:
             y_scaled = self._yscaler.fit_transform(y_orig.reshape(-1, 1)).ravel()
         else:
             self._yscaler = None
-            y_scaled = y_orig  # sin escalado
+            y_scaled = y_orig
         
         for epoch in range(epochs):
-            total_error = 0
-            total_error_real = 0
-            for inputs, label, label_real in zip(training_inputs, y_scaled, y_orig):
+            # FASE 1: Actualización de pesos (patrón por patrón)
+            for inputs, label in zip(training_inputs, y_scaled):
                 summation = np.dot(inputs, self.weights) + self.bias
                 prediction = self.activation_function(summation)
                 error = label - prediction
-                total_error += error**2
-                if(rng is not None):
-                    error_real = label_real - self._yscaler.inverse_transform(prediction.reshape(-1,1)).ravel()
-                    total_error_real += error_real**2
                 
                 # Actualización usando gradiente descendente
                 delta = error * self.activation_derivative(np.dot(inputs, self.weights) + self.bias)
                 self.weights += self.learning_rate * delta * inputs
                 self.bias += self.learning_rate * delta
+            
+            # FASE 2: Cálculo del error (después de actualizar todos los pesos)
+            total_error = 0
+            total_error_real = 0
+            
+            for inputs, label, label_real in zip(training_inputs, y_scaled, y_orig):
+                summation = np.dot(inputs, self.weights) + self.bias
+                prediction = self.activation_function(summation)
+                error = label - prediction
+                total_error += error**2
                 
+                if rng is not None:
+                    prediction_real = self._yscaler.inverse_transform(prediction.reshape(-1,1)).ravel()
+                    error_real = label_real - prediction_real
+                    total_error_real += error_real**2
+            
             mse = float(total_error / len(training_inputs))
             self.errors_history_scaled.append(mse)
             
-            if(rng is not None):
+            if rng is not None:
                 mse_real = float(total_error_real / len(training_inputs))
                 self.errors_history_real.append(mse_real)
             else:
