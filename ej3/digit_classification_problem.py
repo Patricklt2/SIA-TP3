@@ -67,7 +67,7 @@ def solve_digit_classification_problem():
     print("\n--- Evaluación con Datos Originales (sin ruido) ---")
     predictions = mlp.predict(X_digits)
     predicted_digits = np.argmax(predictions, axis=1)
-    accuracy = np.mean(predicted_digits == y_digits.flatten()) * 100
+    accuracy = np.mean(predicted_digits.flatten() == y_digits.flatten()) * 100
     
     for i in range(len(X_digits)):
         print(f"Dígito: {y_digits[i].item()}, Predicción: {predicted_digits[i]} -> {'Correcto' if predicted_digits[i] == y_digits[i].item() else 'Incorrecto'}")
@@ -78,7 +78,7 @@ def solve_digit_classification_problem():
     X_noisy = add_noise(X_digits, noise_level=0.15)
     predictions_noisy = mlp.predict(X_noisy)
     predicted_digits_noisy = np.argmax(predictions_noisy, axis=1)
-    accuracy_noisy = np.mean(predicted_digits_noisy == y_digits.flatten()) * 100
+    accuracy_noisy = np.mean(predicted_digits_noisy.flatten() == y_digits.flatten()) * 100
 
     for i in range(len(X_noisy)):
         print(f"Dígito: {y_digits[i].item()}, Predicción con ruido: {predicted_digits_noisy[i]} -> {'Correcto' if predicted_digits_noisy[i] == y_digits[i].item() else 'Incorrecto'}")
