@@ -19,66 +19,112 @@ pip install numpy pandas scikit-learn matplotlib tensorflow
 ## Ejercicio 1
 
 ### Descripción
-Este proyecto implementa un **perceptrón simple** (sin librerías de machine learning) para resolver los problemas lógicos planteados.
-
-Se entrenan y evalúan dos funciones lógicas:  
-- **AND** (`and_problem.py`)  
-- **XOR** (`xor_problem.py`)  
-
-El script principal (`main.py`) ejecuta ambos experimentos y muestra los resultados.
+En este ejercicio se implementa un **perceptrón simple con activación escalón** para resolver los problemas lógicos clásicos **AND** y **XOR**.  
+Además, se incluye una herramienta de visualización que muestra la evolución de la **frontera de decisión** a lo largo de las épocas de entrenamiento.
 
 ### Ejecución
 
 Para correr la simulación del Ejercicio 1, asegúrate de estar en la carpeta raíz del proyecto y ejecuta el siguiente comando en tu terminal:
 
+Desde la carpeta raíz del proyecto:
+
 ```bash
-python3 -m ej1.main
+python -m ej1.main
 ```
+
+Esto ejecutará ambos experimentos:
+- **AND** → problema linealmente separable (convergencia exitosa)  
+- **XOR** → problema no linealmente separable (el perceptrón no converge)
+
+Cada experimento imprime el progreso del entrenamiento y el estado final de los pesos.
+
+Para observar cómo cambia la frontera del perceptrón en cada época, correr:
+
+```bash
+python -m ej1.visualize_epocs
+```
+
+Esto generará y mostrará las gráficas:
+- `all_lines_AND.png` → evolución de las fronteras para el problema AND  
+- `all_lines_XOR.png` → evolución de las fronteras para el problema XOR  
+
+Cada línea representa la frontera de decisión en una época distinta, con la **última resaltada en negro**.
 
 ## Ejercicio 2
 
 ### Descripción
-En este ejercicio se implementa un **perceptrón simple lineal** y un **perceptrón simple no lineal** (con activaciones `sigmoid` y `tanh`) para comparar su capacidad de aprendizaje sobre el conjunto de datos provisto (`TP3-ej2-conjunto.csv`).
 
-Se entrenan los modelos utilizando **validación cruzada (k-fold)** y se evalúan con métricas como:
-- **MSE** (Mean Squared Error)  
-- **MAE** (Mean Absolute Error)  
-- **R²** (Coeficiente de determinación)  
+En este ejercicio se implementa y evalúa un **Perceptrón Simple** con distintas funciones de activación:
+- **Lineal**
+- **Tanh**
+- **Sigmoide**
 
-Además, se generan gráficos de curvas de aprendizaje, comparaciones de métricas y predicciones vs valores reales.
+El objetivo es estudiar cómo los **hiperparámetros β (beta)** y la **tasa de aprendizaje (learning rate)** afectan el desempeño,  
+y luego analizar la **capacidad de generalización** mediante validación cruzada (*k-fold*).
 
 
 ### Ejecución
 Desde la carpeta raíz del proyecto, correr:
 
-```bash
-python -m ej2.compare_activations -c ej2/base.json 
-```
+#### Comparación de activaciones y búsqueda de hiperparámetros
+Ejecuta el barrido de **β** y **learning rate** para las activaciones `tanh`, `sigmoid` y `linear`:
 
 ```bash
-python -m ej2.plot_comparisons -c ej2/base.json --results_dir ej2/results/compare --out_dir ej2/results/plots 
+python -m ej2.compare_activations -c ej2/base.json
 ```
+
+Esto genera en `ej2/results/compare/`:
+- `all_trials.csv` → todos los runs
+- `bests.csv` → mejor combinación por activación
+
+#### Visualización de comparaciones
+Graficá los resultados anteriores (MSE vs β, MSE vs LR, comparación entre activaciones):
 
 ```bash
-python -m ej2.generalization_study -c ej2/generalization_config.json --ks 3,4,5,6,8,10 --reps 5 --results_dir ej2/results/generalization 
+python -m ej2.plot_comparisons -c ej2/base.json --results_dir ej2/results/compare --out_dir ej2/results/plots
 ```
+
+Salidas:
+- `*_mse_train_vs_beta.png` → evolución del MSE según β  
+- `*_mse_train_vs_lr.png` → evolución del MSE según LR  
+- `comparative_best_models_bar.png` → comparación de mejores modelos  
+- `all_best_train_histories.png` → curvas de entrenamiento de los mejores modelos
+
+#### Estudio de generalización (barrido de K y folds)
+Evalúa cómo cambia la generalización con distintos K y folds:
 
 ```bash
-python ej2/plot_generalize.py --summary ej2/results/generalization/generalization_summary.json 
+python -m ej2.generalization_study -c ej2/generalization_config.json --ks 3,4,5,6,8,10 --reps 5 --results_dir ej2/results/generalization
 ```
+
+Guarda:
+- `k_sweep.csv` → resultados promediados por K  
+- `fold_sweep_kX.csv` → resultados por fold de test  
+- `generalization_summary.json` → resumen con `k_best` y `fold_best`
+
+#### Visualización del estudio de generalización
+Genera gráficos resumen del barrido de K y de folds:
 
 ```bash
-python ej2/plot_folds.py --summary ej2/results/generalization/generalization_summary.json  
+python -m ej2.plot_generalize --summary ej2/results/generalization/generalization_summary.json
 ```
 
-Esto hará lo siguiente:
-1. Leer el dataset `TP3-ej2-conjunto.csv`.  
-2. Entrenar perceptrones lineales y no lineales con distintas configuraciones de hiperparámetros (`beta`).  
-3. Guardar resultados en la carpeta `results/`:  
-   - `metrics_comparison.png` → comparación de métricas entre modelos.  
-   - `Learning_Curves-<activation>.png` → curvas de aprendizaje para cada activación.  
-   - `Predictions_vs_True_Values-...png` → gráfico de comparación entre predicciones y valores reales.  
-   - `performance_metrics.csv` → archivo resumen con métricas de cada modelo.  
+Salidas:
+- `generalization_k_sweep_<act>.png` → MSE vs K (train/test)
+- `generalization_fold_sweep_<act>_k<best>.png` → MSE por fold + dispersión train/test
+
+
+#### Análisis de datos por fold
+Muestra cómo se distribuyen las features y el target en cada fold:
+
+```bash
+python -m ej2.plot_folds --summary ej2/results/generalization/generalization_summary.json
+```
+
+Genera en `ej2/results/plots/generalization/`:
+- `all_folds_strip_features_target_kX.png`  
+- `all_folds_boxplot_features_target_kX.png`
+
 
 ## Ejercicio 3
 
