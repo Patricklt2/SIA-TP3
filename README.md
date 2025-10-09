@@ -8,6 +8,7 @@
   - `scikit-learn`
   - `matplotlib`
   - `tensorflow` 
+  - `pillow` 
 
 Instalación rápida:  
 ```bash
@@ -175,4 +176,9 @@ En este ejercicio se usa el **Perceptrón Multicapa (MLP)** para clasificar díg
 
 ```bash
 python -m ej4.main
+```
+### Luego se puede correr una pizarra interactiva para probar al perceptron
+
+```bash
+python -m ej4.interactive_predictor
 ```
