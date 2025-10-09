@@ -70,7 +70,7 @@ class SimplePerceptron:
             return (-1, 1)
         return None  # lineal -> no escalo
 
-    def train(self, training_inputs, y, epochs=1000, verbose=True):
+    def train(self, training_inputs, y, epochs=1000, verbose=True, min_mse=0.0001):
         """
         Entrena el perceptrón no lineal.
         """
@@ -91,6 +91,8 @@ class SimplePerceptron:
             self._yscaler = None
             y_scaled = y_orig
         
+        
+
         for epoch in range(epochs):
             # FASE 1: Actualización de pesos (patrón por patrón)
             for inputs, label in zip(training_inputs, y_scaled):
@@ -99,9 +101,11 @@ class SimplePerceptron:
                 error = label - prediction
                 
                 # Actualización usando gradiente descendente
-                delta = error * self.activation_derivative(np.dot(inputs, self.weights) + self.bias)
+                delta = error * self.activation_derivative(summation)
                 self.weights += self.learning_rate * delta * inputs
                 self.bias += self.learning_rate * delta
+
+
             
             # FASE 2: Cálculo del error (después de actualizar todos los pesos)
             total_error = 0
@@ -123,14 +127,15 @@ class SimplePerceptron:
             
             if rng is not None:
                 mse_real = float(total_error_real / len(training_inputs))
-                self.errors_history_real.append(mse_real)
             else:
-                self.errors_history_real.append(mse)
+                mse_real = mse
+
+            self.errors_history_real.append(mse_real)
 
             if verbose and epoch % 100 == 0:
                 print(f"Época {epoch}/{epochs} - MSE: {mse:.6f}")
                 
-            if mse < 0.0001:
+            if mse_real < min_mse:
                 if verbose:
                     print("Convergencia alcanzada.")
                 return True
