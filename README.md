@@ -162,10 +162,6 @@ python -m ej3.digit_classification_problem
 python -m ej3.analysis_runner
 ```
 
-Este script genera gráficos comparativos:
-- `optimizer_analysis.png` → rendimiento de distintos optimizadores.  
-- `learning_rate_analysis.png` → efecto de la tasa de aprendizaje con Adam.  
-
 ## Ejercicio 4
 
 ### Descripción
