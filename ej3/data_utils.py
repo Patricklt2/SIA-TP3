@@ -1,51 +1,30 @@
 # /home/pipemind/sia/SIA-TP3/ej3/data_utils.py
 import numpy as np
+import re
 
 def load_digits_data(file_path):
-    """
-    Carga los datos de los dígitos desde el archivo de texto.
-    Esta versión es más robusta y maneja el formato del archivo correctamente.
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"No se pudo encontrar el archivo de dígitos en: {file_path}")
 
-    Args:
-        file_path (str): La ruta al archivo 'TP3-ej3-digitos.txt'.
+    all_pixels_str = re.sub(r'\s+', '', content)
+    all_pixels = [int(p) for p in all_pixels_str]
 
-    Returns:
-        tuple: Una tupla conteniendo:
-            - X (np.array): Un array con 10 muestras, cada una un vector de 35 características.
-            - y (np.array): Un array con las 10 etiquetas numéricas (0-9).
-    """
-    with open(file_path, 'r') as f:
-        content = f.read()
-
-    # Los dígitos están separados por una o más líneas en blanco.
-    # Usamos split() para separar los bloques de dígitos.
-    digit_blocks = content.strip().split('\n\n')
-    
+    num_digits = len(all_pixels) // 35
     X = []
-    y = []
+    for i in range(num_digits):
+        start_index = i * 35
+        end_index = start_index + 35
+        digit_pixels = all_pixels[start_index:end_index]
+        X.append(digit_pixels)
 
-    for i, block in enumerate(digit_blocks):
-        if not block.strip():
-            continue
+    if not X:
+        raise ValueError("No se pudieron cargar los dígitos del archivo. Revisa el formato.")
 
-        digit_lines = block.strip().split('\n')
-        digit_vector = []
-        
-        for line in digit_lines:
-            # Reemplazar espacios con '0' y tomar solo los primeros 5 caracteres
-            # para asegurar que cada línea tenga 5 píxeles.
-            processed_line = line.replace(' ', '0')[:5]
-            pixels = [int(p) for p in processed_line]
-            digit_vector.extend(pixels)
-        
-        # Asegurarse de que el vector tenga 35 píxeles, rellenando si es necesario
-        if len(digit_vector) < 35:
-            digit_vector.extend([0] * (35 - len(digit_vector)))
-        
-        X.append(digit_vector[:35]) # Tomar solo los primeros 35
-        y.append(i)
+    y = np.arange(num_digits)
 
-    num_digits = len(X)
     X = np.array(X).reshape(num_digits, 35, 1)
     y = np.array(y).reshape(num_digits, 1)
     

@@ -25,15 +25,10 @@ class Dense(Layer):
         return np.dot(self.weights, self.input) + self.bias
 
     def backward(self, output_gradient):
-        # Gradiente de los pesos
         weights_gradient = np.dot(output_gradient, self.input.T)
         
-        # LA CORRECCIÓN DEFINITIVA ESTÁ AQUÍ:
-        # El gradiente del sesgo es la suma de los gradientes de salida a lo largo del eje del lote.
         bias_gradient = np.sum(output_gradient, axis=1, keepdims=True)
         
-        # Gradiente para propagar a la capa anterior
         input_gradient = np.dot(self.weights.T, output_gradient)
         
-        # Devolver los 3 gradientes
         return input_gradient, weights_gradient, bias_gradient
