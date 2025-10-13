@@ -127,6 +127,14 @@ Genera en `ej2/results/plots/generalization/`:
 - `all_folds_boxplot_features_target_kX.png`
 
 
+```bash
+python -m ej2.compare_folds  --dataset ej2/TP3-ej2-conjunto.csv  --target y  --klist 3,4,5,6  --reps 5  --epochs 200  --lr 0.01  --activation tanh  --beta 1.5  --seed 1234  --out ej2/results/cv_study.json --save_curves --curves_out ej2/results/curves_best.json
+```
+
+```bash
+python -m ej2.plot_generalization  --study ej2/results/cv_study.json  --curves ej2/results/curves_best.json  --outdir ej2/results/plots
+```
+
 ## Ejercicio 3
 
 ### Descripción

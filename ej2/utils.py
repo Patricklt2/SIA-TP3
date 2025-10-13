@@ -1,12 +1,7 @@
-# ej2/fold_runner_sp.py
 import os, json, argparse
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import KFold
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_absolute_error, r2_score
 
-# Importa TU perceptrón (perceptron.py)
 from perceptrons.simple.perceptron import SimplePerceptron
 
 def evaluate_real(y_pred, y_true):
@@ -14,9 +9,7 @@ def evaluate_real(y_pred, y_true):
     y_pred = np.asarray(y_pred).ravel()
     y_true = np.asarray(y_true).ravel()
     mse = float(np.mean((y_true - y_pred) ** 2))
-    mae = float(mean_absolute_error(y_true, y_pred))
-    r2  = float(r2_score(y_true, y_pred))
-    return mse, mae, r2
+    return mse
 
 def make_kfold_indices(n_samples: int, k: int):
     """
@@ -43,30 +36,13 @@ def make_kfold_indices(n_samples: int, k: int):
         start = stop
     return folds
 
-def run(cfg):
+def run(kfolds, test_fold, activation, beta, lr, epochs, reps, seed_base, shuffle, verbose, out_csv):
     # --- datos ---
     data = pd.read_csv(cfg["dataset"])
     target = cfg.get("target", "y")
 
     y_raw = data[target].values.astype(float)
     X_raw = data[[c for c in data.columns if c != target]].values.astype(float)
-
-    # --- hiperparámetros ---
-    kfolds      = int(cfg["kfolds"])
-    test_fold   = int(cfg["test_fold"])      # 1..k
-    activation  = str(cfg["activation"]).lower()
-    beta        = float(cfg.get("beta", 1.0))
-    lr          = float(cfg["learning_rate"])
-    epochs      = int(cfg["epochs"])
-    reps        = int(cfg["repetitions"])
-    seed_base   = int(cfg.get("seed", 1234))
-    shuffle     = bool(cfg.get("shuffle", True))
-    verbose     = bool(cfg.get("verbose", False))
-    out_csv     = cfg.get("output_csv", "results/fold_run_sp.csv")
-
-    # ✅ NORMALIZACIÓN ANTES de la partición
-    # xsc = MinMaxScaler(feature_range=(-1, 1))
-    # X_scaled = xsc.fit_transform(X_raw)  # Escalar TODO el dataset
 
     n_samples = X_raw.shape[0]
     folds = make_kfold_indices(n_samples, kfolds)
@@ -103,9 +79,13 @@ def run(cfg):
         # predicciones en ESCALA REAL (el modelo ya desescala si corresponde)
         y_hat_test = model.predict(X_test)
 
+        if(verbose):
+            for y_pred, y_real in zip(y_hat_test, y_test):
+                print(f"Real: {y_real:.4f}. Predicted: {y_pred:.4f}")
+
         # métricas en escala real
         mse_tr = model.errors_history_real[-1]
-        mse_te, mae_te, r2_te = evaluate_real(y_hat_test, y_test)
+        mse_te = evaluate_real(y_hat_test, y_test)
 
         results.append({
             "activation": activation,
@@ -121,8 +101,6 @@ def run(cfg):
             "test_fold": test_fold,
             "mse_train": mse_tr,
             "mse_test": mse_te,
-            "mae_test": mae_te,
-            "r2_test": r2_te,
             "bias": float(model.bias),
             **{f"w_{i}": float(wi) for i, wi in enumerate(model.weights)},
             # historiales del modelo
@@ -137,18 +115,34 @@ def run(cfg):
     df.to_csv(out_csv, index=False)
     print(f"\n✅ Guardado en {out_csv} ({len(df)} filas)")
     print(f"Test fold: {test_fold}/{kfolds}")
-    print(f"Promedio MSE_test = {df['mse_test'].mean():.6f}")
+    print(f"MSE_train = {df['mse_train'].mean():.6f}")
+    print(f"MSE_test = {df['mse_test'].mean():.6f}")
     
     # Mostrar estadísticas de la partición
     print(f"Train samples: {len(X_train)}, Test samples: {len(X_test)}")
     print(f"y_train range: [{y_train.min():.3f}, {y_train.max():.3f}]")
     print(f"y_test range:  [{y_test.min():.3f}, {y_test.max():.3f}]")
+    return df
+ 
 
-# ---------- CLI ----------
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Runner de perceptrón usando SimplePerceptron (K-Fold fijo)")
-    ap.add_argument("--config", "-c", required=True, help="Ruta al archivo JSON de configuración")
+    ap.add_argument("--config", "-c", required=True, help="Ruta al archivo JSON de configuración")        
     args = ap.parse_args()
-    with open(args.config, "r", encoding="utf-8") as f:
+    with open(args.config, "r") as f:
         cfg = json.load(f)
-    run(cfg)
+
+    # Parámetros del JSON
+    kfolds = int(cfg.get("kfolds", 5))
+    test_fold = int(cfg.get("test_fold", 1))
+    activation = cfg.get("activation", "tanh")
+    beta = float(cfg.get("beta", 1.0))
+    lr = float(cfg.get("learning_rate", 0.01))
+    epochs = int(cfg.get("epochs", 1000))
+    reps = int(cfg.get("repetitions", 5))
+    seed_base = int(cfg.get("seed", 1234))
+    shuffle = bool(cfg.get("shuffle", True))
+    verbose = bool(cfg.get("verbose", False))
+    out_csv = cfg.get("output_csv", "results.csv")
+
+    run(kfolds, test_fold, activation, beta, lr, epochs, reps, seed_base, shuffle, verbose, out_csv)

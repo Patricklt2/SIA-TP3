@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
 
 class SimplePerceptron:
     """
@@ -22,7 +21,49 @@ class SimplePerceptron:
         self.beta = beta
         self.errors_history_scaled = []
         self.errors_history_real = []
+        self.weights_history = []
         self._yscaler = None
+
+    def _transform_y(self, y, range_to):
+        """Transforma y al rango especificado usando MinMax manual."""
+        y_min, y_max = y.min(), y.max()
+        a, b = range_to
+        
+        if np.isclose(y_min, y_max):
+            return np.full_like(y, a, dtype=float), {"a": a, "b": b, "y_min": y_min, "y_max": y_max}
+        else:
+            y_scaled = a + (y - y_min) * (b - a) / (y_max - y_min)
+            return y_scaled, {"a": a, "b": b, "y_min": y_min, "y_max": y_max}
+
+    def _inverse_transform_y(self, y_scaled, scaler_dict):
+        """Transforma inversa de y escalado a valores originales."""
+        a, b, y_min, y_max = scaler_dict["a"], scaler_dict["b"], scaler_dict["y_min"], scaler_dict["y_max"]
+        
+        if np.isclose(y_min, y_max):
+            return np.full_like(y_scaled, y_min, dtype=float)
+        else:
+            return y_min + (y_scaled - a) * (y_max - y_min) / (b - a)
+        
+    def get_testmse_history(self, X_test, y_test):
+        y_true = np.asarray(y_test, dtype=float).ravel()
+        mses = []
+
+        for W, b in self.weights_history:
+            # forward con pesos/bias de ese "epoch"
+            s = np.dot(X_test, W) + b
+            y_pred_scaled = self.activation_function(s)
+
+            # volver a escala real si hubo escalado
+            if self._yscaler is not None:
+                y_pred = self._inverse_transform_y(y_pred_scaled, self._yscaler)
+            else:
+                y_pred = y_pred_scaled
+
+            err = y_true - y_pred
+            mse = float(np.mean(err ** 2))
+            mses.append(mse)
+
+        return mses
 
     def activation_function(self, x):
         """
@@ -60,7 +101,7 @@ class SimplePerceptron:
         summation = np.dot(inputs, self.weights) + self.bias
         out = self.activation_function(summation)
         if self._yscaler is not None:
-            out = self._yscaler.inverse_transform(out.reshape(-1,1)).ravel()
+            out = self._inverse_transform_y(out, self._yscaler)
         return out
     
     def _range_for_act(self):
@@ -76,6 +117,7 @@ class SimplePerceptron:
         """
         self.errors_history_scaled = []
         self.errors_history_real = []
+        self.weights_history = []
         
         if verbose:
             print(f"Entrenando perceptrón no lineal ({self.activation_type})...")
@@ -85,14 +127,11 @@ class SimplePerceptron:
         # Escalado de y si corresponde
         rng = self._range_for_act()
         if rng is not None:
-            self._yscaler = MinMaxScaler(feature_range=rng)
-            y_scaled = self._yscaler.fit_transform(y_orig.reshape(-1, 1)).ravel()
+            y_scaled, self._yscaler = self._transform_y(y_orig, rng)
         else:
             self._yscaler = None
             y_scaled = y_orig
         
-        
-
         for epoch in range(epochs):
             # FASE 1: Actualización de pesos (patrón por patrón)
             for inputs, label in zip(training_inputs, y_scaled):
@@ -105,7 +144,7 @@ class SimplePerceptron:
                 self.weights += self.learning_rate * delta * inputs
                 self.bias += self.learning_rate * delta
 
-
+            self.weights_history.append((self.weights.copy(), self.bias))
             
             # FASE 2: Cálculo del error (después de actualizar todos los pesos)
             total_error = 0
@@ -118,7 +157,7 @@ class SimplePerceptron:
                 total_error += error**2
                 
                 if rng is not None:
-                    prediction_real = self._yscaler.inverse_transform(prediction.reshape(-1,1)).ravel()
+                    prediction_real = self._inverse_transform_y(prediction, self._yscaler)
                     error_real = label_real - prediction_real
                     total_error_real += error_real**2
             
