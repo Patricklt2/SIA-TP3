@@ -1,4 +1,3 @@
-
 import argparse, json, os
 import numpy as np
 import pandas as pd
@@ -7,36 +6,62 @@ import matplotlib.pyplot as plt
 from perceptrons.simple.perceptron import SimplePerceptron
 from ej2.utils import evaluate_real, make_kfold_indices
 
-# ---------------- helpers for curves & scatter ----------------
+def collect_all_folds_curves(dataset, target, k, reps, epochs, lr, activation, beta, seed_base):
+    """Entrena para todos los folds y guarda curvas de todos ellos"""
+    data = pd.read_csv(dataset)
+    y = data[target].values.astype(float)
+    X = data[[c for c in data.columns if c != target]].values.astype(float)
+    folds = make_kfold_indices(X.shape[0], k)
+    
+    all_folds_data = {}
+    
+    for fold_idx, (tr_idx, te_idx) in enumerate(folds, start=1):
+        Xtr, Xte = X[tr_idx], X[te_idx]
+        ytr, yte = y[tr_idx], y[te_idx]
 
-def _inverse_minmax_numpy(y_scaled, scaler_dict):
-    """Inverse of manual minmax used by our perceptron._yscaler dict."""
-    a = scaler_dict["a"]; b = scaler_dict["b"]
-    y_min = scaler_dict["y_min"]; y_max = scaler_dict["y_max"]
-    if np.isclose(y_min, y_max):
-        return np.full_like(y_scaled, y_min, dtype=float)
-    return y_min + (y_scaled - a) * (y_max - y_min) / (b - a)
+        fold_best_te_final = float("inf")
+        fold_best_train_curve = None
+        fold_best_test_curve = None
+        fold_best_test_true = None
+        fold_best_test_pred = None
 
-def get_testmse_history_from_weights(model, X_test, y_test):
-    """Recalcula MSE de test por época usando weights_history y la activación del modelo."""
-    y_true = np.asarray(y_test, dtype=float).ravel()
-    mses = []
-    for W, b in model.weights_history:
-        s = X_test @ W + b
-        y_pred_scaled = model.activation_function(s)
-        if getattr(model, "_yscaler", None) is not None:
-            y_pred = _inverse_minmax_numpy(y_pred_scaled.astype(float), model._yscaler)
-        else:
-            y_pred = y_pred_scaled
-        mses.append(float(np.mean((y_true - y_pred) ** 2)))
-    return mses
+        for r in range(1, reps + 1):
+            np.random.seed(seed_base + fold_idx * 1000 + r)
+            model = SimplePerceptron(
+                input_size=Xtr.shape[1],
+                learning_rate=lr,
+                activation=activation,
+                beta=beta
+            )
+            model.train(Xtr, ytr, epochs=epochs, verbose=False)
+
+            train_curve = list(map(float, model.errors_history_real))
+            test_curve = list(map(float, model.get_testmse_history(Xte, yte)))
+
+            te_final = test_curve[-1] if len(test_curve) else float("inf")
+            if te_final < fold_best_te_final:
+                fold_best_te_final = te_final
+                fold_best_train_curve = train_curve
+                fold_best_test_curve = test_curve
+                yhat_te_final = model.predict(Xte)
+                fold_best_test_true = yte.astype(float).ravel().tolist()
+                fold_best_test_pred = np.asarray(yhat_te_final, dtype=float).ravel().tolist()
+
+        all_folds_data[f"fold_{fold_idx}"] = {
+            "train_mse_per_epoch": fold_best_train_curve or [],
+            "test_mse_per_epoch": fold_best_test_curve or [],
+            "test_scatter": {"y_true": fold_best_test_true or [], "y_pred": fold_best_test_pred or []},
+            "final_test_mse": fold_best_te_final
+        }
+    
+    return all_folds_data
 
 def collect_bestcase_curves(dataset, target, k, fold, reps, epochs, lr, activation, beta, seed_base):
     """Vuelve a entrenar en el mejor K/fold para encontrar la mejor repetición
     (por MSE de test final) y devuelve:
       - train_mse_per_epoch
       - test_mse_per_epoch
-      - train_scatter: y_true, y_pred finales
+      - test_scatter: y_true, y_pred finales
     """
     data = pd.read_csv(dataset)
     y = data[target].values.astype(float)
@@ -49,8 +74,8 @@ def collect_bestcase_curves(dataset, target, k, fold, reps, epochs, lr, activati
     best_te_final = float("inf")
     best_train_curve = None
     best_test_curve = None
-    best_train_true = None
-    best_train_pred = None
+    best_test_true = None
+    best_test_pred = None
 
     for r in range(1, reps + 1):
         np.random.seed(seed_base + r)
@@ -63,63 +88,22 @@ def collect_bestcase_curves(dataset, target, k, fold, reps, epochs, lr, activati
         model.train(Xtr, ytr, epochs=epochs, verbose=False)
 
         train_curve = list(map(float, model.errors_history_real))
-
-        if hasattr(model, "get_testmse_history"):
-            test_curve = list(map(float, model.get_testmse_history(Xte, yte)))
-        else:
-            test_curve = get_testmse_history_from_weights(model, Xte, yte)
+        test_curve = list(map(float, model.get_testmse_history(Xte, yte)))
 
         te_final = test_curve[-1] if len(test_curve) else float("inf")
         if te_final < best_te_final:
             best_te_final = te_final
             best_train_curve = train_curve
             best_test_curve = test_curve
-            yhat_tr_final = model.predict(Xtr)
-            best_train_true = ytr.astype(float).ravel().tolist()
-            best_train_pred = np.asarray(yhat_tr_final, dtype=float).ravel().tolist()
+            yhat_te_final = model.predict(Xte)
+            best_test_true = yte.astype(float).ravel().tolist()
+            best_test_pred = np.asarray(yhat_te_final, dtype=float).ravel().tolist()
 
     return {
         "train_mse_per_epoch": best_train_curve or [],
         "test_mse_per_epoch": best_test_curve or [],
-        "train_scatter": {"y_true": best_train_true or [], "y_pred": best_train_pred or []}
+        "test_scatter": {"y_true": best_test_true or [], "y_pred": best_test_pred or []}
     }
-
-def plot_learning_curves(curves_json, outpath):
-    with open(curves_json, "r") as f:
-        curves = json.load(f)
-    tr = np.asarray(curves.get("train_mse_per_epoch", []), dtype=float)
-    te = np.asarray(curves.get("test_mse_per_epoch", []), dtype=float)
-    plt.figure(figsize=(8,6))
-    plt.plot(np.arange(len(tr)), tr, label="Train MSE", linewidth=2)
-    plt.plot(np.arange(len(te)), te, label="Test MSE", linewidth=2)
-    plt.yscale("log")
-    plt.xlabel("Épocas")
-    plt.ylabel("MSE (escala real)")
-    plt.title("Evolución del MSE por época (mejor caso)")
-    plt.legend()
-    plt.grid(True, which="both", alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(outpath)
-    plt.close()
-
-def plot_train_scatter(curves_json, outpath):
-    with open(curves_json, "r") as f:
-        curves = json.load(f)
-    y_true = np.asarray(curves.get("train_scatter", {}).get("y_true", []), dtype=float)
-    y_pred = np.asarray(curves.get("train_scatter", {}).get("y_pred", []), dtype=float)
-    plt.figure(figsize=(6,6))
-    plt.scatter(y_true, y_pred, s=14, alpha=0.7, edgecolors="none")
-    if y_true.size > 0:
-        lo = float(min(y_true.min(), y_pred.min()))
-        hi = float(max(y_true.max(), y_pred.max()))
-        plt.plot([lo, hi], [lo, hi], linestyle="--", linewidth=1)
-    plt.xlabel("y (real) - train")
-    plt.ylabel("ŷ (predicho) - train")
-    plt.title("Dispersión y vs ŷ en TRAIN (mejor caso)")
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(outpath)
-    plt.close()
 
 # ---------------- existing study (no per-epoch) ----------------
 
@@ -242,9 +226,11 @@ if __name__ == "__main__":
     ap.add_argument("--seed", type=int, default=1234, help="Seed base")
     ap.add_argument("--out", default="cv_study.json", help="Archivo de salida (.json)")
     # nuevos flags
-    ap.add_argument("--save_curves", action="store_true", help="Guarda epoch vs MSE (train/test) y scatter (train) del mejor K/fold.")
+    ap.add_argument("--save_curves", action="store_true", help="Guarda epoch vs MSE (train/test) y scatter (test) del mejor K/fold.")
+    ap.add_argument("--save_all_folds_curves", action="store_true", help="Guarda curvas para TODOS los folds del mejor K.")
     ap.add_argument("--curves_out", default=None, help="Ruta del JSON de curvas (default: mismo dir de --out, nombre curves_best.json)")
-    ap.add_argument("--plots_outdir", default=None, help="Si se setea, guarda learning_curves.png y train_scatter.png aquí.")
+    ap.add_argument("--all_folds_curves_out", default=None, help="Ruta del JSON de curvas de todos los folds")
+    ap.add_argument("--plots_outdir", default=None, help="Si se setea, guarda learning_curves.png y test_scatter.png aquí.")
 
     args = ap.parse_args()
     k_list = parse_k_list(args.klist)
@@ -268,7 +254,7 @@ if __name__ == "__main__":
     print(f"✅ Guardado estudio en {args.out}")
     print(f"Mejor k: {study['best_k']}  | Mejor fold dentro de k: {study['best_fold_in_best_k']}")
 
-    # guardar curvas y/o plots si se pidió
+    # guardar curvas del mejor fold si se pidió
     if args.save_curves or args.plots_outdir:
         best_k = int(study["best_k"])
         best_fold = int(study["best_fold_in_best_k"])
@@ -293,7 +279,7 @@ if __name__ == "__main__":
                 curves_path = os.path.join(base_dir, "curves_best.json")
             with open(curves_path, "w") as f:
                 json.dump(curves, f, indent=2)
-            print(f"🟢 Curvas guardadas en {curves_path}")
+            print(f"🟢 Curvas del mejor fold guardadas en {curves_path}")
         else:
             # si no guardamos archivo, crear temporal para plots
             base_dir = os.path.dirname(args.out) or "."
@@ -305,5 +291,30 @@ if __name__ == "__main__":
         if args.plots_outdir:
             os.makedirs(args.plots_outdir, exist_ok=True)
             plot_learning_curves(curves_path, os.path.join(args.plots_outdir, "learning_curves_best.png"))
-            plot_train_scatter(curves_path, os.path.join(args.plots_outdir, "train_scatter_y_vs_yhat.png"))
+            plot_test_scatter(curves_path, os.path.join(args.plots_outdir, "test_scatter_y_vs_yhat.png"))
             print(f"📈 Plots guardados en {args.plots_outdir}")
+
+    # guardar curvas de todos los folds si se pidió
+    if args.save_all_folds_curves:
+        best_k = int(study["best_k"])
+        all_folds_curves = collect_all_folds_curves(
+            dataset=args.dataset,
+            target=args.target,
+            k=best_k,
+            reps=args.reps,
+            epochs=args.epochs,
+            lr=args.lr,
+            activation=args.activation,
+            beta=args.beta,
+            seed_base=args.seed
+        )
+        
+        if args.all_folds_curves_out:
+            all_folds_path = args.all_folds_curves_out
+        else:
+            base_dir = os.path.dirname(args.out) or "."
+            all_folds_path = os.path.join(base_dir, f"curves_all_folds_k{best_k}.json")
+        
+        with open(all_folds_path, "w") as f:
+            json.dump(all_folds_curves, f, indent=2)
+        print(f"🟢 Curvas de TODOS los folds guardadas en {all_folds_path}")
