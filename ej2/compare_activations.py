@@ -2,8 +2,7 @@
 import os, json, argparse
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import KFold
-from sklearn.preprocessing import MinMaxScaler
+
 
 from perceptrons.simple.perceptron import SimplePerceptron
 from ej2.utils import make_kfold_indices, ensure_dir, load_config, load_data, train_once
