@@ -212,5 +212,4 @@ __marimo__/
 
 # Ignorar archivos CSV
 ej2/results/compare/*.csv
-ej2/results/generalization/*.csv
-ej2/results/generalization/*.json
+ej2/results/*.json

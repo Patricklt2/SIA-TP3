@@ -4,6 +4,36 @@ import pandas as pd
 
 from perceptrons.simple.perceptron import SimplePerceptron
 
+def ensure_dir(p):
+    if p:
+        os.makedirs(p, exist_ok=True)
+
+def load_config(config_path):
+    """Carga la configuración desde un archivo JSON"""
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    
+    # Valores por defecto si no están en el config
+    default_config = {
+        "target": "y",
+        "klist": "3,4,5,6,8,10",
+        "reps": 5,
+        "epochs": 1200,
+        "lr": 0.01,
+        "activation": "tanh",
+        "beta": 1.0,
+        "out": "cv_study.json",
+        "save_all_folds_curves": False,
+        "all_folds_curves_out": None
+    }
+    
+    # Combinar configuraciones (los valores del archivo tienen prioridad)
+    for key, value in default_config.items():
+        if key not in config:
+            config[key] = value
+    
+    return config
+
 def evaluate_real(y_pred, y_true):
     """Métricas en escala REAL (y_pred ya viene desescalado por el modelo)."""
     y_pred = np.asarray(y_pred).ravel()
@@ -13,7 +43,7 @@ def evaluate_real(y_pred, y_true):
 
 def make_kfold_indices(n_samples: int, k: int):
     """
-    Genera una lista de pares (train_idx, test_idx) para K-Fold sin shuffle.
+    Genera una lista de pares (train_idx, test_idx) para K-Fold.
     Reparte lo más parejo posible; los primeros (n_samples % k) folds tienen 1 muestra extra.
 
     Returns: list[tuple[np.ndarray, np.ndarray]]
@@ -36,7 +66,25 @@ def make_kfold_indices(n_samples: int, k: int):
         start = stop
     return folds
 
-def run(kfolds, test_fold, activation, beta, lr, epochs, reps, seed_base, shuffle, verbose, out_csv):
+def load_data(dataset, target):
+    """Carga dataset y devuelve Xtr, ytr, Xte, yte con el fold indicado (1-indexed)."""
+    data = pd.read_csv(dataset)
+    y = data[target].values.astype(float)
+    X = data[[c for c in data.columns if c != target]].values.astype(float)
+    return y, X
+
+def train_once(Xtr, ytr, epochs, lr, activation, beta):
+    model = SimplePerceptron(
+        input_size=Xtr.shape[1],
+        learning_rate=float(lr),
+        activation=str(activation),
+        beta=float(beta) if beta is not None else 1.0
+    )
+    model.train(Xtr, ytr, epochs=int(epochs), verbose=False)
+    # historial de MSE en escala real (train)
+    return model
+
+def run(kfolds, test_fold, activation, beta, lr, epochs, reps, verbose, out_csv):
     # --- datos ---
     data = pd.read_csv(cfg["dataset"])
     target = cfg.get("target", "y")
@@ -61,9 +109,6 @@ def run(kfolds, test_fold, activation, beta, lr, epochs, reps, seed_base, shuffl
     results = []
 
     for r in range(1, reps + 1):
-        # ✅ Seed diferente para cada repetición (solo para pesos)
-        seed_rep = seed_base + r
-        np.random.seed(seed_rep)  # para la init de pesos/bias
 
         # --- modelo ---
         model = SimplePerceptron(
@@ -95,9 +140,6 @@ def run(kfolds, test_fold, activation, beta, lr, epochs, reps, seed_base, shuffl
             "repetitions": reps,
             "rep": r,
             "kfolds": kfolds,
-            "shuffle": shuffle,
-            "seed_base": seed_base,
-            "seed_used": seed_rep,  # ✅ Seed correcta
             "test_fold": test_fold,
             "mse_train": mse_tr,
             "mse_test": mse_te,
@@ -140,9 +182,7 @@ if __name__ == "__main__":
     lr = float(cfg.get("learning_rate", 0.01))
     epochs = int(cfg.get("epochs", 1000))
     reps = int(cfg.get("repetitions", 5))
-    seed_base = int(cfg.get("seed", 1234))
-    shuffle = bool(cfg.get("shuffle", True))
     verbose = bool(cfg.get("verbose", False))
     out_csv = cfg.get("output_csv", "results.csv")
 
-    run(kfolds, test_fold, activation, beta, lr, epochs, reps, seed_base, shuffle, verbose, out_csv)
+    run(kfolds, test_fold, activation, beta, lr, epochs, reps, verbose, out_csv)

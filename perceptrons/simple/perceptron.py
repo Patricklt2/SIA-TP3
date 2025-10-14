@@ -75,8 +75,6 @@ class SimplePerceptron:
             return np.tanh(self.beta * x)
         elif self.activation_type == 'sigmoid':
             return 1 / (1 + np.exp(-self.beta * x))
-        elif self.activation_type == 'relu':
-            return np.maximum(0, x)
         return x
 
     def activation_derivative(self, x):
@@ -90,8 +88,6 @@ class SimplePerceptron:
         elif self.activation_type == 'sigmoid':
             sig = 1 / (1 + np.exp(-self.beta * x))
             return self.beta * sig * (1 - sig)
-        elif self.activation_type == 'relu':
-            return np.where(x > 0, 1, 0)
         return 1
 
     def predict(self, inputs):
@@ -107,7 +103,7 @@ class SimplePerceptron:
     def _range_for_act(self):
         if self.activation_type == "sigmoid":
             return (0, 1)
-        if self.activation_type == "tanh":
+        elif self.activation_type == "tanh":
             return (-1, 1)
         return None  # lineal -> no escalo
 
@@ -146,10 +142,11 @@ class SimplePerceptron:
 
             self.weights_history.append((self.weights.copy(), self.bias))
             
-            # FASE 2: Cálculo del error (después de actualizar todos los pesos)
+            # FASE 2: Cálculo del error DESPUÉS de actualizar todos los pesos
             total_error = 0
             total_error_real = 0
             
+            # Recalcular predicciones con los pesos FINALES de esta época
             for inputs, label, label_real in zip(training_inputs, y_scaled, y_orig):
                 summation = np.dot(inputs, self.weights) + self.bias
                 prediction = self.activation_function(summation)
@@ -172,7 +169,7 @@ class SimplePerceptron:
             self.errors_history_real.append(mse_real)
 
             if verbose and epoch % 100 == 0:
-                print(f"Época {epoch}/{epochs} - MSE: {mse:.6f}")
+                print(f"Época {epoch}/{epochs} - MSE: {mse_real:.6f}")
                 
             if mse_real < min_mse:
                 if verbose:

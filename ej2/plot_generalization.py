@@ -104,32 +104,60 @@ def plot_learning_curves_single_fold(curves_json, outdir, fold_name="best"):
     test  = np.asarray(curves.get("test_mse_per_epoch", []), dtype=float)
     epochs = np.arange(len(train))
 
-    # Gráfico completo
+    # Gráfico completo - escala lineal
     plt.figure(figsize=(8,6))
     plt.plot(epochs, train, label="Train MSE", linewidth=2)
     plt.plot(np.arange(len(test)), test, label="Test MSE", linewidth=2)
-    plt.title(f"Evolución del MSE por época - Fold {fold_name}")
+    plt.title(f"Evolución del MSE por época - {fold_name}")
     plt.xlabel("Épocas")
-    plt.ylabel("MSE (escala real)")
+    plt.ylabel("MSE (escala lineal)")
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(os.path.join(outdir, f"learning_curves_{fold_name}.png"))
     plt.close()
 
-    # Gráfico desde época 80
+    # Gráfico completo - escala logarítmica desde época 0
+    plt.figure(figsize=(8,6))
+    plt.plot(epochs, train, label="Train MSE", linewidth=2)
+    plt.plot(np.arange(len(test)), test, label="Test MSE", linewidth=2)
+    plt.yscale("log")
+    plt.title(f"Evolución del MSE por época (escala log) - {fold_name}")
+    plt.xlabel("Épocas")
+    plt.ylabel("MSE (escala logarítmica)")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(outdir, f"learning_curves_{fold_name}_log.png"))
+    plt.close()
+
+    # Gráfico desde época 80 - escala lineal
     start = 80
     if len(train) > start:
         plt.figure(figsize=(8,6))
         plt.plot(epochs[start:], train[start:], label="Train MSE", linewidth=2)
         plt.plot(np.arange(start, len(test)), test[start:], label="Test MSE", linewidth=2)
-        plt.title(f"Evolución del MSE desde la época {start} - Fold {fold_name}")
+        plt.title(f"Evolución del MSE desde la época {start} - {fold_name}")
         plt.xlabel("Épocas")
-        plt.ylabel("MSE (escala real)")
+        plt.ylabel("MSE (escala lineal)")
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(outdir, f"learning_curves_{fold_name}_from{start}.png"))
+        plt.close()
+
+        # Gráfico desde época 80 - escala logarítmica
+        plt.figure(figsize=(8,6))
+        plt.plot(epochs[start:], train[start:], label="Train MSE", linewidth=2)
+        plt.plot(np.arange(start, len(test)), test[start:], label="Test MSE", linewidth=2)
+        plt.yscale("log")
+        plt.title(f"Evolución del MSE desde la época {start} (escala log) - {fold_name}")
+        plt.xlabel("Épocas")
+        plt.ylabel("MSE (escala logarítmica)")
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(outdir, f"learning_curves_{fold_name}_from{start}_log.png"))
         plt.close()
 
 def plot_test_scatter_single_fold(curves_json, outpath, fold_name="best"):
@@ -150,7 +178,7 @@ def plot_test_scatter_single_fold(curves_json, outpath, fold_name="best"):
         plt.plot([minv, maxv], [minv, maxv], linestyle="--", linewidth=1)
     plt.xlabel("y (real)")
     plt.ylabel("ŷ (predicho) - test")
-    plt.title(f"Dispersión y vs ŷ en TEST - Fold {fold_name}")
+    plt.title(f"Dispersión y vs ŷ en TEST - {fold_name}")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(outpath)
@@ -169,20 +197,34 @@ def plot_learning_curves_all_folds(all_folds_json, outdir):
         test = np.asarray(fold_data.get("test_mse_per_epoch", []), dtype=float)
         epochs = np.arange(len(train))
 
-        # Gráfico completo para este fold
+        # Gráfico completo - escala lineal
         plt.figure(figsize=(8,6))
         plt.plot(epochs, train, label="Train MSE", linewidth=2)
         plt.plot(np.arange(len(test)), test, label="Test MSE", linewidth=2)
         plt.title(f"Evolución del MSE por época - {fold_name}")
         plt.xlabel("Épocas")
-        plt.ylabel("MSE (escala real)")
+        plt.ylabel("MSE (escala lineal)")
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(outdir, f"learning_curves_{fold_name}.png"))
         plt.close()
 
-        # Gráfico desde época 80 para este fold
+        # Gráfico completo - escala logarítmica desde época 0
+        plt.figure(figsize=(8,6))
+        plt.plot(epochs, train, label="Train MSE", linewidth=2)
+        plt.plot(np.arange(len(test)), test, label="Test MSE", linewidth=2)
+        plt.yscale("log")
+        plt.title(f"Evolución del MSE por época (escala log) - {fold_name}")
+        plt.xlabel("Épocas")
+        plt.ylabel("MSE (escala logarítmica)")
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(outdir, f"learning_curves_{fold_name}_log.png"))
+        plt.close()
+
+        # Gráfico desde época 80 - escala lineal
         start = 80
         if len(train) > start:
             plt.figure(figsize=(8,6))
@@ -190,11 +232,25 @@ def plot_learning_curves_all_folds(all_folds_json, outdir):
             plt.plot(np.arange(start, len(test)), test[start:], label="Test MSE", linewidth=2)
             plt.title(f"Evolución del MSE desde la época {start} - {fold_name}")
             plt.xlabel("Épocas")
-            plt.ylabel("MSE (escala real)")
+            plt.ylabel("MSE (escala lineal)")
             plt.legend()
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
             plt.savefig(os.path.join(outdir, f"learning_curves_{fold_name}_from{start}.png"))
+            plt.close()
+
+            # Gráfico desde época 80 - escala logarítmica
+            plt.figure(figsize=(8,6))
+            plt.plot(epochs[start:], train[start:], label="Train MSE", linewidth=2)
+            plt.plot(np.arange(start, len(test)), test[start:], label="Test MSE", linewidth=2)
+            plt.yscale("log")
+            plt.title(f"Evolución del MSE desde la época {start} (escala log) - {fold_name}")
+            plt.xlabel("Épocas")
+            plt.ylabel("MSE (escala logarítmica)")
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+            plt.savefig(os.path.join(outdir, f"learning_curves_{fold_name}_from{start}_log.png"))
             plt.close()
 
         # Scatter plot para este fold

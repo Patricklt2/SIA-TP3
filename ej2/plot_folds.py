@@ -5,27 +5,78 @@ import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.model_selection import KFold
+from matplotlib.patches import Patch
 
 def ensure_dir(p):
     os.makedirs(p, exist_ok=True)
 
-def get_all_folds_data(summary):
-    """Obtiene los datos de train y test para TODOS los folds"""
-    dataset = summary['dataset']
-    target = summary.get('target', 'y')
-    kfolds = summary['k_best']
+def load_config(config_path):
+    """Carga la configuración desde un archivo JSON"""
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    
+    # Valores por defecto si no están en el config
+    default_config = {
+        "target": "y",
+        "klist": "3,4,5,6,8,10",
+        "reps": 5,
+        "epochs": 1200,
+        "lr": 0.01,
+        "activation": "tanh",
+        "beta": 1.0,
+        "seed": 1234,
+        "out": "cv_study.json",
+        "save_all_folds_curves": False,
+        "all_folds_curves_out": None
+    }
+    
+    # Combinar configuraciones (los valores del archivo tienen prioridad)
+    for key, value in default_config.items():
+        if key not in config:
+            config[key] = value
+    
+    return config
+
+def make_kfold_indices(n_samples: int, k: int):
+    """
+    Genera una lista de pares (train_idx, test_idx) para K-Fold sin shuffle.
+    Reparte lo más parejo posible; los primeros (n_samples % k) folds tienen 1 muestra extra.
+
+    Returns: list[tuple[np.ndarray, np.ndarray]]
+    """
+    if k < 2 or k > n_samples:
+        raise ValueError(f"k debe estar en [2, {n_samples}]")
+
+    fold_sizes = [n_samples // k] * k
+    for i in range(n_samples % k):
+        fold_sizes[i] += 1
+
+    indices = np.arange(n_samples)
+    folds = []
+    start = 0
+    for size in fold_sizes:
+        stop = start + size
+        test_idx = indices[start:stop]
+        train_idx = np.concatenate([indices[:start], indices[stop:]])
+        folds.append((train_idx, test_idx))
+        start = stop
+    return folds
+
+def get_all_folds_data(config, k_best):
+    """Obtiene los datos de train y test para TODOS los folds usando make_kfold_indices"""
+    dataset = config['dataset']
+    target = config['target']
     
     df = pd.read_csv(dataset)
     feature_names = [col for col in df.columns if col != target]
     X_raw = df[feature_names].values.astype(float)
     y_raw = df[target].values.astype(float)
     
-    kf = KFold(n_splits=int(kfolds), shuffle=False)
+    folds = make_kfold_indices(len(X_raw), int(k_best))
     
     fold_data = {}
     
-    for fold_idx, (train_idx, test_idx) in enumerate(kf.split(X_raw), 1):
+    for fold_idx, (train_idx, test_idx) in enumerate(folds, 1):
         X_train, X_test = X_raw[train_idx], X_raw[test_idx]
         y_train, y_test = y_raw[train_idx], y_raw[test_idx]
         
@@ -91,16 +142,18 @@ def create_strip_plot_data(fold_data, fold_num, feature_names):
     
     return pd.DataFrame(feature_data), pd.DataFrame(target_data)
 
-def plot_all_folds_features_strip(fold_data, fold_sweep_csv, out_dir, activation, k_best):
+def plot_all_folds_features_strip(fold_data, study, out_dir, activation, k_best):
     """Crea strip plots de features para TODOS los folds"""
     
-    # Cargar performance
-    df_perf = pd.read_csv(fold_sweep_csv)
+    # Obtener performance del estudio
     performance_by_fold = {}
     for fold_num in fold_data.keys():
-        perf_data = df_perf[df_perf['test_fold'] == fold_num]
-        if not perf_data.empty:
-            performance_by_fold[fold_num] = perf_data['mse_test_mean'].iloc[0]
+        # Buscar el fold en el estudio
+        fold_data_study = study["per_k"][str(k_best)]["folds"]
+        for fold_info in fold_data_study:
+            if fold_info["fold"] == fold_num:
+                performance_by_fold[fold_num] = fold_info["mse_test_mean"]
+                break
     
     feature_names = list(fold_data.values())[0]['feature_names']
     all_folds = sorted(fold_data.keys())
@@ -187,16 +240,18 @@ def plot_all_folds_features_strip(fold_data, fold_sweep_csv, out_dir, activation
     plt.close()
     print(f"[saved] {path}")
 
-def plot_all_folds_features_boxplot(fold_data, fold_sweep_csv, out_dir, activation, k_best):
+def plot_all_folds_features_boxplot(fold_data, study, out_dir, activation, k_best):
     """Crea boxplots de features para TODOS los folds"""
     
-    # Cargar performance
-    df_perf = pd.read_csv(fold_sweep_csv)
+    # Obtener performance del estudio
     performance_by_fold = {}
     for fold_num in fold_data.keys():
-        perf_data = df_perf[df_perf['test_fold'] == fold_num]
-        if not perf_data.empty:
-            performance_by_fold[fold_num] = perf_data['mse_test_mean'].iloc[0]
+        # Buscar el fold en el estudio
+        fold_data_study = study["per_k"][str(k_best)]["folds"]
+        for fold_info in fold_data_study:
+            if fold_info["fold"] == fold_num:
+                performance_by_fold[fold_num] = fold_info["mse_test_mean"]
+                break
     
     feature_names = list(fold_data.values())[0]['feature_names']
     all_folds = sorted(fold_data.keys())
@@ -255,7 +310,6 @@ def plot_all_folds_features_boxplot(fold_data, fold_sweep_csv, out_dir, activati
         ax1.set_xticklabels(feature_names, rotation=45)
         
         # Añadir leyenda
-        from matplotlib.patches import Patch
         legend_elements = [
             Patch(facecolor='lightblue', alpha=0.7, label='Train'),
             Patch(facecolor='lightcoral', alpha=0.7, label='Test')
@@ -303,36 +357,35 @@ def plot_all_folds_features_boxplot(fold_data, fold_sweep_csv, out_dir, activati
     print(f"[saved] {path}")
 
 def main():
-    ap = argparse.ArgumentParser(description="Strip plots y boxplots para TODOS los folds")
-    ap.add_argument("--summary", required=True, help="Archivo JSON de resumen de generalización")
-    ap.add_argument("--out_dir", default="ej2/results/plots/generalization", help="Directorio de salida")
+    ap = argparse.ArgumentParser(description="Strip plots y boxplots para TODOS los folds usando config.json")
+    ap.add_argument("--config", required=True, help="Ruta al archivo config.json")
+    ap.add_argument("--study", required=True, help="Archivo JSON del estudio (cv_study.json)")
+    ap.add_argument("--out_dir", default="ej2/results/plots/folds_analysis", help="Directorio de salida")
     args = ap.parse_args()
     
     ensure_dir(args.out_dir)
     
-    # Cargar resumen de generalización
-    with open(args.summary, 'r', encoding='utf-8') as f:
-        summary = json.load(f)
+    # Cargar configuración
+    config = load_config(args.config)
     
-    activation = summary['activation']
-    k_best = summary['k_best']
-    fold_sweep_csv = summary.get('fold_sweep_csv')
+    # Cargar estudio
+    with open(args.study, 'r', encoding='utf-8') as f:
+        study = json.load(f)
     
-    if not fold_sweep_csv or not os.path.exists(fold_sweep_csv):
-        print(f"[ERROR] No se encuentra fold_sweep_csv: {fold_sweep_csv}")
-        return
+    activation = config['activation']
+    k_best = study['best_k']
     
     # Obtener datos de TODOS los folds
-    fold_data = get_all_folds_data(summary)
+    fold_data = get_all_folds_data(config, k_best)
     
     print(f"📊 Analizando TODOS los {len(fold_data)} folds para K={k_best}")
     
     # Generar ambos gráficos
     print("📈 Generando strip plot completo para todos los folds...")
-    plot_all_folds_features_strip(fold_data, fold_sweep_csv, args.out_dir, activation, k_best)
+    plot_all_folds_features_strip(fold_data, study, args.out_dir, activation, k_best)
     
     print("📊 Generando boxplot completo para todos los folds...")
-    plot_all_folds_features_boxplot(fold_data, fold_sweep_csv, args.out_dir, activation, k_best)
+    plot_all_folds_features_boxplot(fold_data, study, args.out_dir, activation, k_best)
     
     print(f"\n✅ Ambos gráficos guardados en: {os.path.abspath(args.out_dir)}")
 

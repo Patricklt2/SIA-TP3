@@ -2,212 +2,233 @@
 import os, json, argparse
 import numpy as np
 import pandas as pd
-from ej2.runner import run  # tu runner con run(cfg)
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import MinMaxScaler
 
-# barrido
-DEF_BETAS = [0.2, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
-DEF_LRS   = [1e-4, 1e-3, 1e-2, 1e-1, 1, 10]      # para tanh/sigmoid (fase LR)
-DEF_LRS_LINEAL = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]  # para linear
+from perceptrons.simple.perceptron import SimplePerceptron
+from ej2.utils import make_kfold_indices, ensure_dir, load_config, load_data, train_once
 
-def ensure_dir(p):
-    os.makedirs(p, exist_ok=True)
+# Barridos por defecto
+DEF_BETAS = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
+DEF_LRS   = [1e-4, 1e-3, 1e-2, 1e-1, 1, 10]      # tanh/sigmoid
+DEF_LRS_LINEAR = [1e-5, 1e-4, 1e-3, 1e-2]  # linear
 
 def parse_list(s, cast=float):
-    if not s: return None
+    if not s:
+        return None
     return [cast(x.strip()) for x in s.split(",") if x.strip()]
 
-def run_cfg_and_read(cfg):
-    """Ejecuta runner.run(cfg) y devuelve el DataFrame de ese run (5 repeticiones)."""
-    out_csv = cfg["output_csv"]
-    ensure_dir(os.path.dirname(out_csv) or ".")
-    df = run(cfg)  # si tu runner no devuelve df, lo leemos
-    if df is None:
-        df = pd.read_csv(out_csv)
-    return df
+def load_split(dataset, target, kfolds, test_fold):
+    """Carga dataset y devuelve Xtr, ytr, Xte, yte con el fold indicado (1-indexed)."""
+    y, X = load_data(dataset, target)
+    folds = make_kfold_indices(X.shape[0], int(kfolds))
+    tr_idx, te_idx = folds[int(test_fold) - 1]
+    return X[tr_idx], y[tr_idx], X[te_idx], y[te_idx]
 
-def _row_from_run(cfg, df_run, phase):
-    """
-    Devuelve un dict resumen de un run:
-      - mse_train_mean/std (SE USA PARA ELEGIR MEJORES)
-      - (opcional) mse_test_mean/std (solo referencia)
-    """
-    mse_tr_mean = float(df_run["mse_train"].mean())
-    mse_tr_std  = float(df_run["mse_train"].std(ddof=1)) if len(df_run) > 1 else 0.0
-    mse_te_mean = float(df_run["mse_test"].mean()) if "mse_test" in df_run.columns else np.nan
-    mse_te_std  = float(df_run["mse_test"].std(ddof=1)) if "mse_test" in df_run.columns and len(df_run) > 1 else np.nan
 
-    return {
-        "phase": phase,
-        "activation": cfg["activation"],
-        "beta": cfg.get("beta", np.nan),
-        "learning_rate": cfg["learning_rate"],
-        "epochs": cfg["epochs"],
-        "kfolds": cfg["kfolds"],
-        "test_fold": cfg["test_fold"],
-        "shuffle": cfg["shuffle"],
-        "repetitions": cfg["repetitions"],
-        "seed_base": cfg["seed"],
-        "mse_train_mean": mse_tr_mean,   # << clave
-        "mse_train_std":  mse_tr_std,    # << clave
-        "avg_mse_test":   mse_te_mean,   # referencia
-        "std_mse_test":   mse_te_std,    # referencia
-        "run_csv": cfg["output_csv"]
-    }
+def aggregate_over_reps(Xtr, ytr, epochs, lr, activation, beta, reps):
+    finals, hists = [], []
+    for r in range(1, reps + 1):
+        model = train_once(Xtr, ytr, epochs, lr, activation, beta)
+        hist = [float(v) for v in list(model.errors_history_real)]
+        mse_final = float(hist[-1]) if hist else float("inf")
+        finals.append(mse_final)
+        hists.append(hist)
+    finals = np.asarray(finals, dtype=float)
+    mean = float(np.mean(finals))
+    std  = float(np.std(finals, ddof=1)) if finals.size > 1 else 0.0
+    # el "mejor" hist (menor final)
+    best_idx = int(np.argmin(finals))
+    best_hist = hists[best_idx] if hists else []
+    return mean, std, best_hist
 
-def phase_beta_sweep(base, results_dir, betas, reps):
-    """
-    Barre beta para tanh y sigmoid con el LR base del JSON.
-    Elige β* por menor mse_train_mean (PROMEDIO de las 5 reps de train).
-    """
+def phase_beta_sweep(config, results_dir, betas, reps):
+    """Barre beta para tanh y sigmoid (LR fijo del JSON). Devuelve mejor beta por activación (por TRAIN)."""
     trials = []
-    best_beta = {}  # activation -> beta
+    best_beta = {}
 
-    for act in ["tanh", "sigmoid"]:
-        best_score = np.inf
+    # pre-split (fix fold)
+    Xtr, ytr, _, _ = load_split(config["dataset"], config["target"],
+                                config["kfolds"], config["test_fold"])
+
+    for act in ["tanh"]:
+        best_score = float("inf")
         best_b = None
-
         for beta in betas:
-            tmp_name = f"{act}_beta{beta}.csv"
-            cfg = {
-                "dataset":       base["dataset"],
-                "target":        base.get("target", "y"),
-                "kfolds":        int(base["kfolds"]),
-                "test_fold":     int(base["test_fold"]),
-                "shuffle":       bool(base.get("shuffle", True)),
-                "activation":    act,
-                "beta":          float(beta),
-                "learning_rate": float(base.get("learning_rate", 0.01)),  # LR fijo en fase β
-                "epochs":        int(base["epochs"]),
-                "repetitions":   reps,
-                "seed":          int(base.get("seed", 1234)),
-                "output_csv":    os.path.join(results_dir, f"tmp_{tmp_name}")
+            mean_tr, std_tr, _ = aggregate_over_reps(
+                Xtr, ytr,
+                epochs=config["epochs"],
+                lr=config["lr"],
+                activation=act,
+                beta=beta,
+                reps=reps
+            )
+            row = {
+                "phase": "beta",
+                "activation": act,
+                "beta": float(beta),
+                "learning_rate": float(config["lr"]),
+                "epochs": int(config["epochs"]),
+                "kfolds": int(config["kfolds"]),
+                "test_fold": int(config["test_fold"]),
+                "repetitions": int(reps),
+                "mse_train_mean": mean_tr,
+                "mse_train_std":  std_tr
             }
-            df_run = run_cfg_and_read(cfg)
-            row = _row_from_run(cfg, df_run, phase="beta")
             trials.append(row)
-
-            score = row["mse_train_mean"]   # << usamos TRAIN
-            if score < best_score:
-                best_score = score
+            if mean_tr < best_score:
+                best_score = mean_tr
                 best_b = beta
-
         best_beta[act] = best_b
         print(f"➡️ Mejor β para {act}: {best_b} (MSE_train promedio={best_score:.6f})")
 
+    # guardar ALL
+    all_df = pd.DataFrame(trials)
+    ensure_dir(results_dir)
+    all_path = os.path.join(results_dir, "all_trials.csv")
+    all_df.to_csv(all_path, index=False)
+
     return best_beta, trials
 
-def phase_lr_sweep(base, results_dir, lrs, reps, best_beta):
-    """
-    Barre LR para tanh/sigmoid usando su mejor beta (por train);
-    y para linear barre LR sin beta.
-    """
+def phase_lr_sweep(config, results_dir, lrs, reps, best_beta):
+    """Barre LR para tanh/sigmoid con β* y para linear por su lista de LR."""
     trials = []
 
-    # tanh & sigmoid con β óptimo
-    for act in ["tanh", "sigmoid"]:
-        beta_star = best_beta.get(act, None)
-        if beta_star is None:
+    Xtr, ytr, _, _ = load_split(config["dataset"], config["target"],
+                                config["kfolds"], config["test_fold"])
+
+    # tanh/sigmoid con β*
+    for act in ["tanh"]:
+        bstar = best_beta.get(act, None)
+        if bstar is None:
             continue
         for lr in lrs:
-            tmp_name = f"{act}_beta{beta_star}_lr{lr}.csv"
-            cfg = {
-                "dataset":       base["dataset"],
-                "target":        base.get("target", "y"),
-                "kfolds":        int(base["kfolds"]),
-                "test_fold":     int(base["test_fold"]),
-                "shuffle":       bool(base.get("shuffle", True)),
-                "activation":    act,
-                "beta":          float(beta_star),
+            mean_tr, std_tr, _ = aggregate_over_reps(
+                Xtr, ytr,
+                epochs=config["epochs"],
+                lr=lr,
+                activation=act,
+                beta=bstar,
+                reps=reps
+            )
+            trials.append({
+                "phase": "lr",
+                "activation": act,
+                "beta": float(bstar),
                 "learning_rate": float(lr),
-                "epochs":        int(base["epochs"]),
-                "repetitions":   reps,
-                "seed":          int(base.get("seed", 1234)),
-                "output_csv":    os.path.join(results_dir, f"tmp_{tmp_name}")
-            }
-            df_run = run_cfg_and_read(cfg)
-            row = _row_from_run(cfg, df_run, phase="lr")
-            trials.append(row)
+                "epochs": int(config["epochs"]),
+                "kfolds": int(config["kfolds"]),
+                "test_fold": int(config["test_fold"]),
+                "repetitions": int(reps),
+                "mse_train_mean": mean_tr,
+                "mse_train_std":  std_tr
+            })
 
-    # linear solo LR
-    for lr in DEF_LRS_LINEAL:
-        tmp_name = f"linear_lr{lr}.csv"
-        cfg = {
-            "dataset":       base["dataset"],
-            "target":        base.get("target", "y"),
-            "kfolds":        int(base["kfolds"]),
-            "test_fold":     int(base["test_fold"]),
-            "shuffle":       bool(base.get("shuffle", True)),
-            "activation":    "linear",
-            "beta":          float(base.get("beta", 1.0)),  # ignorado por linear
+    # linear: solo LR
+    for lr in DEF_LRS_LINEAR:
+        mean_tr, std_tr, _ = aggregate_over_reps(
+            Xtr, ytr,
+            epochs=config["epochs"],
+            lr=lr,
+            activation="linear",
+            beta=config["beta"],
+            reps=reps
+        )
+        trials.append({
+            "phase": "lr",
+            "activation": "linear",
+            "beta": float(config["beta"]),  # ignorado
             "learning_rate": float(lr),
-            "epochs":        int(base["epochs"]),
-            "repetitions":   reps,
-            "seed":          int(base.get("seed", 1234)),
-            "output_csv":    os.path.join(results_dir, f"tmp_{tmp_name}")
-        }
-        df_run = run_cfg_and_read(cfg)
-        row = _row_from_run(cfg, df_run, phase="lr")
-        trials.append(row)
+            "epochs": int(config["epochs"]),
+            "kfolds": int(config["kfolds"]),
+            "test_fold": int(config["test_fold"]),
+            "repetitions": int(reps),
+            "mse_train_mean": mean_tr,
+            "mse_train_std":  std_tr
+        })
+
+    # anexar a ALL
+    all_path = os.path.join(results_dir, "all_trials.csv")
+    if os.path.exists(all_path):
+        prev = pd.read_csv(all_path)
+        all_df = pd.concat([prev, pd.DataFrame(trials)], ignore_index=True)
+    else:
+        all_df = pd.DataFrame(trials)
+    all_df.to_csv(all_path, index=False)
 
     return trials
 
+def compute_bests(all_trials, config, reps):
+    """Selecciona el mejor por activación (por MSE_train) y guarda bests.csv con historia del mejor rep."""
+    df = pd.DataFrame(all_trials)
+    best_rows = []
+    Xtr, ytr, _, _ = load_split(config["dataset"], config["target"],
+                                config["kfolds"], config["test_fold"])
+
+    for act in ["tanh", "sigmoid", "linear"]:
+        sub = df[df["activation"] == act]
+        if sub.empty: 
+            continue
+        # criterio: mínimo mse_train_mean
+        idx = sub["mse_train_mean"].idxmin()
+        best = sub.loc[idx].to_dict()
+
+        # re-entrenar 'reps' repeticiones con esa config y quedarnos con la historia del mejor final
+        lr = best["learning_rate"]
+        beta = best.get("beta", 1.0)
+        finals, hists = [], []
+        for r in range(1, reps+1):
+            model = train_once(Xtr, ytr, config["epochs"], lr, act, beta)
+            hist = [float(v) for v in list(model.errors_history_real)]
+            mse_final = float(hist[-1]) if hist else float("inf")
+            finals.append(mse_final); hists.append(hist)
+        best_i = int(np.argmin(finals))
+        best_hist = hists[best_i] if hists else []
+
+        best["history_train_json"] = json.dumps(best_hist)
+        best_rows.append(best)
+
+    bests_df = pd.DataFrame(best_rows)
+    return bests_df
+
 def main():
-    ap = argparse.ArgumentParser(
-        description="Comparar: 1) mejor β para tanh/sigmoid por MSE_TRAIN, 2) mejor LR con ese β; y linear barrido por LR. 5 reps c/u."
-    )
-    ap.add_argument("-c","--config", required=True,
-                    help="JSON base (dataset, target, kfolds, test_fold, epochs, seed, etc.)")
+    ap = argparse.ArgumentParser(description="Comparar activaciones usando config.json")
+    ap.add_argument("--config", required=True, help="Ruta al archivo config.json")
     ap.add_argument("--betas", help=f"Lista de betas (default {DEF_BETAS})")
     ap.add_argument("--lrs", help=f"Lista de learning_rates para tanh/sigmoid (default {DEF_LRS})")
-    ap.add_argument("--results_dir", default="ej2/results/compare", help="Dónde escribir CSVs")
+    ap.add_argument("--results_dir", default="ej2/results/compare", help="Dónde escribir resultados")
     args = ap.parse_args()
 
-    with open(args.config, "r", encoding="utf-8") as f:
-        base = json.load(f)
-
+    # Cargar configuración
+    config = load_config(args.config)
+    
+    # Agregar parámetros específicos para compare_activations
+    config["kfolds"] = config.get("kfolds", 5)  # Para el split fijo
+    config["test_fold"] = config.get("test_fold", 1)  # Fold fijo para comparación
+    
     betas = parse_list(args.betas) or DEF_BETAS
     lrs   = parse_list(args.lrs)   or DEF_LRS
-    reps  = 5
+    reps  = int(config["reps"])
 
     ensure_dir(args.results_dir)
 
-    # --- Fase 1: elegir mejor beta por activación (por MSE_TRAIN) ---
-    best_beta, trials_beta = phase_beta_sweep(base, args.results_dir, betas, reps)
+    # fase 1
+    best_beta, trials_beta = phase_beta_sweep(config, args.results_dir, betas, reps)
 
-    # --- Fase 2: barrer LR con β* (tanh/sigmoid) + linear por LR ---
-    trials_lr = phase_lr_sweep(base, args.results_dir, lrs, reps, best_beta)
+    # fase 2
+    trials_lr = phase_lr_sweep(config, args.results_dir, lrs, reps, best_beta)
 
-    # --- Guardar ALL y BESTS ---
+    # all_trials ya guardado; armamos en memoria para bests
     all_trials = trials_beta + trials_lr
-    all_df = pd.DataFrame(all_trials)
-    all_path = os.path.join(args.results_dir, "all_trials.csv")
-    all_df.to_csv(all_path, index=False)
-
-    # best por activación (en todo el set) usando MSE_TRAIN
-    best_rows = []
-    for act in ["tanh", "sigmoid", "linear"]:
-        sub = all_df[all_df["activation"] == act]
-        if not len(sub):
-            continue
-        best_idx = sub["mse_train_mean"].idxmin()   # << clave: criterio por TRAIN
-        best_rows.append(sub.loc[best_idx])
-
-    bests_df = pd.DataFrame(best_rows)
+    bests_df = compute_bests(all_trials, config, reps)
     bests_path = os.path.join(args.results_dir, "bests.csv")
     bests_df.to_csv(bests_path, index=False)
 
     print("\n✅ Listo.")
-    print(f"- ALL:   {all_path}")
+    print(f"- ALL:   {os.path.join(args.results_dir, 'all_trials.csv')}")
     print(f"- BESTS: {bests_path}")
-    print("\nβ óptimos detectados (por MSE_train):")
-    for act in ["tanh", "sigmoid"]:
-        print(f"  {act}: β* = {best_beta.get(act)}")
-    if not bests_df.empty:
-        cols = ["activation","beta","learning_rate","mse_train_mean","mse_train_std","run_csv"]
-        print("\nMejores combinaciones finales (por MSE_train):")
-        print(bests_df[cols].to_string(index=False))
-    else:
-        print("\nNo hubo resultados.")
+    for act in ["tanh","sigmoid"]:
+        print(f"  β* {act}: {best_beta.get(act)}")
 
 if __name__ == "__main__":
     main()

@@ -71,7 +71,7 @@ Desde la carpeta raíz del proyecto, correr:
 Ejecuta el barrido de **β** y **learning rate** para las activaciones `tanh`, `sigmoid` y `linear`:
 
 ```bash
-python -m ej2.compare_activations -c ej2/base.json
+python -m ej2.compare_activations --config ej2/config.json 
 ```
 
 Esto genera en `ej2/results/compare/`:
@@ -82,7 +82,7 @@ Esto genera en `ej2/results/compare/`:
 Graficá los resultados anteriores (MSE vs β, MSE vs LR, comparación entre activaciones):
 
 ```bash
-python -m ej2.plot_comparisons -c ej2/base.json --results_dir ej2/results/compare --out_dir ej2/results/plots
+python -m ej2.plot_comparisons --results_dir ej2/results/compare --out_dir ej2/results/plots 
 ```
 
 Salidas:
@@ -95,7 +95,7 @@ Salidas:
 Evalúa cómo cambia la generalización con distintos K y folds:
 
 ```bash
-python -m ej2.generalization_study -c ej2/generalization_config.json --ks 3,4,5,6,8,10 --reps 5 --results_dir ej2/results/generalization
+python -m ej2.compare_folds --config ej2/config_fold.json 
 ```
 
 Guarda:
@@ -107,7 +107,7 @@ Guarda:
 Genera gráficos resumen del barrido de K y de folds:
 
 ```bash
-python -m ej2.plot_generalize --summary ej2/results/generalization/generalization_summary.json
+python -m ej2.plot_generalization  --study ej2/results/cv_study.json  --outdir ej2/results/plots/folds --all_folds_curves ej2/results/curves_all_folds.json  
 ```
 
 Salidas:
@@ -119,21 +119,12 @@ Salidas:
 Muestra cómo se distribuyen las features y el target en cada fold:
 
 ```bash
-python -m ej2.plot_folds --summary ej2/results/generalization/generalization_summary.json
+python -m ej2.plot_folds --config ej2/config_fold.json --study ej2/results/cv_study.json --out_dir ej2/results/plots/folds_analysis
 ```
 
 Genera en `ej2/results/plots/generalization/`:
 - `all_folds_strip_features_target_kX.png`  
 - `all_folds_boxplot_features_target_kX.png`
-
-
-```bash
-python -m ej2.compare_folds  --dataset ej2/TP3-ej2-conjunto.csv  --target y  --klist 3,4,5,6  --reps 5  --epochs 200  --lr 0.01  --activation tanh  --beta 1.5  --seed 1234  --out ej2/results/cv_study.json --save_curves --curves_out ej2/results/curves_best.json --save_all_folds_curves
-```
-
-```bash
-python -m ej2.plot_generalization  --study ej2/results/cv_study.json  --curves ej2/results/curves_best.json  --outdir ej2/results/plots --all_folds_curves ej2/results/curves_all_folds_k5.json
-```
 
 ## Ejercicio 3
 

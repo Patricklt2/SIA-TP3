@@ -1,0 +1,13 @@
+{
+    "target": "y",
+    "klist": "3,4,5,6",
+    "reps": 5,
+    "epochs": 600,
+    "lr": 0.01,
+    "activation": "tanh",
+    "beta": 1.0,
+    "out": "ej2/results/cv_study.json",
+    "save_all_folds_curves": true,
+    "all_folds_curves_out": "ej2/results/curves_all_folds.json",
+    "dataset": "ej2/TP3-ej2-conjunto.csv"
+}

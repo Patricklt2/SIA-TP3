@@ -1,14 +1,12 @@
 {
-  "dataset": "ej2/TP3-ej2-conjunto.csv",
-  "target": "y",
-  "activation": "tanh",
-  "beta": 1.0,
-  "learning_rate": 0.01,
-  "epochs": 1000,
-  "kfolds": 4,
-  "test_fold": 2,
-  "repetitions": 5,
-  "shuffle": true,
-  "seed": 42,
-  "output_csv": "ej2/results/fold_test_run.csv"
+    "dataset": "ej2/TP3-ej2-conjunto.csv",
+    "target": "y",
+    "kfolds": 5,
+    "test_fold": 1,
+    "activation": "tanh",
+    "beta": 1.0,
+    "lr": 0.01,
+    "reps": 5,
+    "epochs": 1000,
+    "out": "compare_results.json"
 }
