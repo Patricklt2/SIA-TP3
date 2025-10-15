@@ -9,7 +9,7 @@ from ej2.utils import make_kfold_indices, ensure_dir, load_config, load_data, tr
 
 # Barridos por defecto
 DEF_BETAS = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
-DEF_LRS   = [1e-4, 1e-3, 1e-2, 1e-1, 1, 10]      # tanh/sigmoid
+DEF_LRS   = [1e-4, 1e-3, 1e-2, 1e-1]      # tanh/sigmoid
 DEF_LRS_LINEAR = [1e-5, 1e-4, 1e-3, 1e-2]  # linear
 
 def parse_list(s, cast=float):
@@ -20,15 +20,16 @@ def parse_list(s, cast=float):
 def load_split(dataset, target, kfolds, test_fold):
     """Carga dataset y devuelve Xtr, ytr, Xte, yte con el fold indicado (1-indexed)."""
     y, X = load_data(dataset, target)
+    y_min, y_max = float(np.min(y)), float(np.max(y))
     folds = make_kfold_indices(X.shape[0], int(kfolds))
     tr_idx, te_idx = folds[int(test_fold) - 1]
-    return X[tr_idx], y[tr_idx], X[te_idx], y[te_idx]
+    return X[tr_idx], y[tr_idx], X[te_idx], y[te_idx], y_min, y_max
 
 
-def aggregate_over_reps(Xtr, ytr, epochs, lr, activation, beta, reps):
+def aggregate_over_reps(Xtr, ytr, epochs, lr, activation, beta, reps, y_min=None, y_max=None):
     finals, hists = [], []
     for r in range(1, reps + 1):
-        model = train_once(Xtr, ytr, epochs, lr, activation, beta)
+        model = train_once(Xtr, ytr, epochs, lr, activation, beta, y_min=y_min, y_max=y_max)
         hist = [float(v) for v in list(model.errors_history_real)]
         mse_final = float(hist[-1]) if hist else float("inf")
         finals.append(mse_final)
@@ -47,10 +48,10 @@ def phase_beta_sweep(config, results_dir, betas, reps):
     best_beta = {}
 
     # pre-split (fix fold)
-    Xtr, ytr, _, _ = load_split(config["dataset"], config["target"],
+    Xtr, ytr, _, _, y_min, y_max = load_split(config["dataset"], config["target"],
                                 config["kfolds"], config["test_fold"])
 
-    for act in ["tanh"]:
+    for act in ["tanh", "sigmoid"]:
         best_score = float("inf")
         best_b = None
         for beta in betas:
@@ -60,7 +61,8 @@ def phase_beta_sweep(config, results_dir, betas, reps):
                 lr=config["lr"],
                 activation=act,
                 beta=beta,
-                reps=reps
+                reps=reps,
+                y_min=y_min, y_max=y_max
             )
             row = {
                 "phase": "beta",
@@ -93,11 +95,11 @@ def phase_lr_sweep(config, results_dir, lrs, reps, best_beta):
     """Barre LR para tanh/sigmoid con β* y para linear por su lista de LR."""
     trials = []
 
-    Xtr, ytr, _, _ = load_split(config["dataset"], config["target"],
+    Xtr, ytr, _, _, y_min, y_max = load_split(config["dataset"], config["target"],
                                 config["kfolds"], config["test_fold"])
 
     # tanh/sigmoid con β*
-    for act in ["tanh"]:
+    for act in ["tanh", "sigmoid"]:
         bstar = best_beta.get(act, None)
         if bstar is None:
             continue
@@ -108,7 +110,8 @@ def phase_lr_sweep(config, results_dir, lrs, reps, best_beta):
                 lr=lr,
                 activation=act,
                 beta=bstar,
-                reps=reps
+                reps=reps,
+                y_min=y_min, y_max=y_max
             )
             trials.append({
                 "phase": "lr",
@@ -131,7 +134,8 @@ def phase_lr_sweep(config, results_dir, lrs, reps, best_beta):
             lr=lr,
             activation="linear",
             beta=config["beta"],
-            reps=reps
+            reps=reps,
+            y_min=y_min, y_max=y_max
         )
         trials.append({
             "phase": "lr",
@@ -161,7 +165,7 @@ def compute_bests(all_trials, config, reps):
     """Selecciona el mejor por activación (por MSE_train) y guarda bests.csv con historia del mejor rep."""
     df = pd.DataFrame(all_trials)
     best_rows = []
-    Xtr, ytr, _, _ = load_split(config["dataset"], config["target"],
+    Xtr, ytr, _, _, y_min, y_max = load_split(config["dataset"], config["target"],
                                 config["kfolds"], config["test_fold"])
 
     for act in ["tanh", "sigmoid", "linear"]:
@@ -177,7 +181,7 @@ def compute_bests(all_trials, config, reps):
         beta = best.get("beta", 1.0)
         finals, hists = [], []
         for r in range(1, reps+1):
-            model = train_once(Xtr, ytr, config["epochs"], lr, act, beta)
+            model = train_once(Xtr, ytr, config["epochs"], lr, act, beta, y_min=y_min, y_max=y_max)
             hist = [float(v) for v in list(model.errors_history_real)]
             mse_final = float(hist[-1]) if hist else float("inf")
             finals.append(mse_final); hists.append(hist)

@@ -2,7 +2,7 @@ import os, json, argparse
 import numpy as np
 import pandas as pd
 
-from perceptrons.simple.perceptron import SimplePerceptron
+from perceptrons.simple.perceptron2 import SimplePerceptron
 
 def ensure_dir(p):
     if p:
@@ -73,25 +73,21 @@ def load_data(dataset, target):
     X = data[[c for c in data.columns if c != target]].values.astype(float)
     return y, X
 
-def train_once(Xtr, ytr, epochs, lr, activation, beta):
+def train_once(Xtr, ytr, epochs, lr, activation, beta, y_min=None, y_max=None):
     model = SimplePerceptron(
         input_size=Xtr.shape[1],
         learning_rate=float(lr),
         activation=str(activation),
         beta=float(beta) if beta is not None else 1.0
     )
-    model.train(Xtr, ytr, epochs=int(epochs), verbose=False)
+    model.train(Xtr, ytr, epochs=int(epochs), verbose=False, y_min=y_min, y_max=y_max)
     # historial de MSE en escala real (train)
     return model
 
-def run(kfolds, test_fold, activation, beta, lr, epochs, reps, verbose, out_csv):
-    # --- datos ---
-    data = pd.read_csv(cfg["dataset"])
-    target = cfg.get("target", "y")
-
-    y_raw = data[target].values.astype(float)
-    X_raw = data[[c for c in data.columns if c != target]].values.astype(float)
-
+def try_once(dataset, kfolds, test_fold, activation, beta, lr, epochs, reps, target):
+    
+    y_raw, X_raw = load_data(dataset, target)
+    
     n_samples = X_raw.shape[0]
     folds = make_kfold_indices(n_samples, kfolds)
 
@@ -106,83 +102,58 @@ def run(kfolds, test_fold, activation, beta, lr, epochs, reps, verbose, out_csv)
     y_train = y_raw[tr_idx]
     y_test  = y_raw[te_idx]
 
-    results = []
+    model = train_once(
+        X_train, y_train,
+        epochs=epochs,
+        lr=lr,
+        activation=activation,
+        beta=beta,
+        y_min=y_raw.min(),
+        y_max=y_raw.max()
+    )
 
-    for r in range(1, reps + 1):
+    print("\n=== Resultados finales ===")
+    print(f"Train mse (real): {model.errors_history_real[-1]:.6f}")
 
-        # --- modelo ---
-        model = SimplePerceptron(
-            input_size=X_train.shape[1],
-            learning_rate=lr,
-            activation=activation,   # 'tanh' | 'sigmoid' | 'linear'
-            beta=beta
-        )
+    # predicciones en ESCALA REAL (el modelo ya desescala si corresponde)
+    y_hat_test = model.predict(X_test)
+        
+    for y_pred, y_real in zip(y_hat_test, y_test):
+        print(f"Real: {y_real:.4f}. Predicted: {y_pred:.4f}")
 
-        # entrenar (el modelo maneja internamente el escalado de y si aplica)
-        model.train(X_train, y_train, epochs=epochs, verbose=verbose)
+    # métricas en escala real
+    mse_te = evaluate_real(y_hat_test, y_test)
 
-        # predicciones en ESCALA REAL (el modelo ya desescala si corresponde)
-        y_hat_test = model.predict(X_test)
-
-        if(verbose):
-            for y_pred, y_real in zip(y_hat_test, y_test):
-                print(f"Real: {y_real:.4f}. Predicted: {y_pred:.4f}")
-
-        # métricas en escala real
-        mse_tr = model.errors_history_real[-1]
-        mse_te = evaluate_real(y_hat_test, y_test)
-
-        results.append({
-            "activation": activation,
-            "beta": beta,
-            "learning_rate": lr,
-            "epochs": epochs,
-            "repetitions": reps,
-            "rep": r,
-            "kfolds": kfolds,
-            "test_fold": test_fold,
-            "mse_train": mse_tr,
-            "mse_test": mse_te,
-            "bias": float(model.bias),
-            **{f"w_{i}": float(wi) for i, wi in enumerate(model.weights)},
-            # historiales del modelo
-            "mse_history_real_json": json.dumps([float(v) for v in getattr(model, "errors_history_real", [])])
-        })
-
-        print(f"Rep {r}/{reps} -> test MSE={mse_te:.6f}")
-
-    # --- salida ---
-    df = pd.DataFrame(results)
-    os.makedirs(os.path.dirname(out_csv) or ".", exist_ok=True)
-    df.to_csv(out_csv, index=False)
-    print(f"\n✅ Guardado en {out_csv} ({len(df)} filas)")
-    print(f"Test fold: {test_fold}/{kfolds}")
-    print(f"MSE_train = {df['mse_train'].mean():.6f}")
-    print(f"MSE_test = {df['mse_test'].mean():.6f}")
-    
-    # Mostrar estadísticas de la partición
-    print(f"Train samples: {len(X_train)}, Test samples: {len(X_test)}")
-    print(f"y_train range: [{y_train.min():.3f}, {y_train.max():.3f}]")
-    print(f"y_test range:  [{y_test.min():.3f}, {y_test.max():.3f}]")
-    return df
- 
+    print(f"Test MSE={mse_te:.6f}")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Runner de perceptrón usando SimplePerceptron (K-Fold fijo)")
     ap.add_argument("--config", "-c", required=True, help="Ruta al archivo JSON de configuración")        
     args = ap.parse_args()
+    
     with open(args.config, "r") as f:
         cfg = json.load(f)
 
-    # Parámetros del JSON
-    kfolds = int(cfg.get("kfolds", 5))
-    test_fold = int(cfg.get("test_fold", 1))
+    # Parámetros del JSON - CONVERTIR A LOS TIPOS CORRECTOS
+    target = cfg.get("target", "y")
+    kfolds = int(cfg.get("kfolds", 5))  # CONVERTIR A INT
+    test_fold = int(cfg.get("test_fold", 1))  # CONVERTIR A INT
     activation = cfg.get("activation", "tanh")
     beta = float(cfg.get("beta", 1.0))
     lr = float(cfg.get("learning_rate", 0.01))
     epochs = int(cfg.get("epochs", 1000))
-    reps = int(cfg.get("repetitions", 5))
-    verbose = bool(cfg.get("verbose", False))
-    out_csv = cfg.get("output_csv", "results.csv")
+    reps = int(cfg.get("reps", 1))  # AÑADIR reps
+    dataset = cfg.get("dataset", "ej2/TP3-ej2-conjunto.csv")
 
-    run(kfolds, test_fold, activation, beta, lr, epochs, reps, verbose, out_csv)
+    # CORREGIDO: Llamada con parámetros en el orden correcto
+    try_once(
+        dataset=dataset,
+        kfolds=kfolds, 
+        test_fold=test_fold, 
+        activation=activation, 
+        beta=beta, 
+        lr=lr, 
+        epochs=epochs, 
+        reps=reps, 
+        target=target
+    )

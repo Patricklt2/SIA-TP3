@@ -9,6 +9,7 @@ from ej2.utils import evaluate_real, make_kfold_indices, load_config, load_data,
 def collect_all_folds_curves(dataset, target, k, reps, epochs, lr, activation, beta):
     """Entrena para todos los folds y guarda curvas de todos ellos"""
     y, X = load_data(dataset, target)
+    y_min, y_max = float(np.min(y)), float(np.max(y))
     folds = make_kfold_indices(X.shape[0], k)
     
     all_folds_data = {}
@@ -24,7 +25,7 @@ def collect_all_folds_curves(dataset, target, k, reps, epochs, lr, activation, b
         fold_best_test_pred = None
 
         for r in range(1, reps + 1):
-            model = train_once(Xtr, ytr, epochs, lr, activation, beta)
+            model = train_once(Xtr, ytr, epochs, lr, activation, beta, y_min=y_min, y_max=y_max)
 
             train_curve = list(map(float, model.errors_history_real))
             test_curve = list(map(float, model.get_testmse_history(Xte, yte)))
@@ -52,6 +53,7 @@ def run_study(
 ):
     data = pd.read_csv(dataset)
     y = data[target].values.astype(float)
+    y_min, y_max = float(np.min(y)), float(np.max(y))
     X = data[[c for c in data.columns if c != target]].values.astype(float)
     n = X.shape[0]
 
@@ -90,7 +92,7 @@ def run_study(
 
             for r in range(1, reps + 1):
 
-                model = train_once(X_train, y_train, epochs, lr, activation, beta)
+                model = train_once(X_train, y_train, epochs, lr, activation, beta, y_min=y_min, y_max=y_max)
 
                 mse_tr = float(model.errors_history_real[-1])
                 y_hat_te = model.predict(X_test)
