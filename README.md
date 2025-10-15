@@ -67,6 +67,35 @@ y luego analizar la **capacidad de generalización** mediante validación cruzad
 ### Ejecución
 Desde la carpeta raíz del proyecto, correr:
 
+#### Ejecución directa de entrenamiento simple
+Permite correr una sola instancia del perceptrón con los parámetros definidos en el config.json
+
+```bash
+python -m ej2.utils --config ej2/config.json
+```
+
+Ejemplo (`ej2/config.json`):
+
+```json
+{
+  "dataset": "ej2/dataset.csv",
+  "target": "y",
+  "klist": "3,4,5,6,8,10",
+  "kfolds": 5,
+  "test_fold": 1,
+  "reps": 5,
+  "epochs": 1000,
+  "lr": 0.01,
+  "activation": "tanh",
+  "beta": 1.0,
+  "out": "ej2/results/folds/cv_study.json",
+  "save_all_folds_curves": true,
+  "all_folds_curves_out": "ej2/results/folds/curves_all_folds_k5.json"
+}
+```
+
+
+
 #### Comparación de activaciones y búsqueda de hiperparámetros
 Ejecuta el barrido de **β** y **learning rate** para las activaciones `tanh`, `sigmoid` y `linear`:
 
@@ -74,9 +103,9 @@ Ejecuta el barrido de **β** y **learning rate** para las activaciones `tanh`, `
 python -m ej2.compare_activations --config ej2/config.json 
 ```
 
-Esto genera en `ej2/results/compare/`:
-- `all_trials.csv` → todos los runs
-- `bests.csv` → mejor combinación por activación
+Guarda:
+- `all_trials.csv`
+- `bests.csv`
 
 #### Visualización de comparaciones
 Graficá los resultados anteriores (MSE vs β, MSE vs LR, comparación entre activaciones):
@@ -85,11 +114,11 @@ Graficá los resultados anteriores (MSE vs β, MSE vs LR, comparación entre act
 python -m ej2.plot_comparisons --results_dir ej2/results/compare --out_dir ej2/results/plots 
 ```
 
-Salidas:
-- `*_mse_train_vs_beta.png` → evolución del MSE según β  
-- `*_mse_train_vs_lr.png` → evolución del MSE según LR  
-- `comparative_best_models_bar.png` → comparación de mejores modelos  
-- `all_best_train_histories.png` → curvas de entrenamiento de los mejores modelos
+Genera:
+- `*_mse_train_vs_beta.png`
+- `*_mse_train_vs_lr.png`
+- `comparative_best_models_bar.png`
+- `all_best_train_histories.png`
 
 #### Estudio de generalización (barrido de K y folds)
 Evalúa cómo cambia la generalización con distintos K y folds:
@@ -98,10 +127,9 @@ Evalúa cómo cambia la generalización con distintos K y folds:
 python -m ej2.compare_folds --config ej2/config_fold.json 
 ```
 
-Guarda:
-- `k_sweep.csv` → resultados promediados por K  
-- `fold_sweep_kX.csv` → resultados por fold de test  
-- `generalization_summary.json` → resumen con `k_best` y `fold_best`
+Genera:
+- `cv_study.json` → resumen de promedios, desviaciones y percentiles por K y por fold.
+- `curves_all_folds_kX.json` → curvas `MSE_train` y `MSE_test` por época (si se activa `save_all_folds_curves`).
 
 #### Visualización del estudio de generalización
 Genera gráficos resumen del barrido de K y de folds:
@@ -110,9 +138,11 @@ Genera gráficos resumen del barrido de K y de folds:
 python -m ej2.plot_generalization  --study ej2/results/cv_study.json  --outdir ej2/results/plots/folds --all_folds_curves ej2/results/curves_all_folds.json  
 ```
 
-Salidas:
-- `generalization_k_sweep_<act>.png` → MSE vs K (train/test)
-- `generalization_fold_sweep_<act>_k<best>.png` → MSE por fold + dispersión train/test
+Produce:
+- `bar_mse_vs_k.png`
+- `bar_folds_in_bestk.png`
+- `learning_curves_foldX.png`
+- `test_scatter_foldX.png`
 
 
 #### Análisis de datos por fold
@@ -122,8 +152,8 @@ Muestra cómo se distribuyen las features y el target en cada fold:
 python -m ej2.plot_folds --config ej2/config_fold.json --study ej2/results/cv_study.json --out_dir ej2/results/plots/folds_analysis
 ```
 
-Genera en `ej2/results/plots/generalization/`:
-- `all_folds_strip_features_target_kX.png`  
+Genera:
+- `all_folds_strip_features_target_kX.png`
 - `all_folds_boxplot_features_target_kX.png`
 
 ## Ejercicio 3
