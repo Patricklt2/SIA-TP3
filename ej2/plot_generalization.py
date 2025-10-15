@@ -3,96 +3,157 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def plot_bar_k(summary, outpath):
-    ks = sorted(int(k) for k in summary["per_k"].keys())
+    ks = sorted(int(k) for k in summary["per_k"].keys() )
 
-    train_means = np.array([summary["per_k"][str(k)]["mean_train_over_folds"] for k in ks])
-    test_means  = np.array([summary["per_k"][str(k)]["mean_test_over_folds"] for k in ks])
-    train_stds  = np.array([summary["per_k"][str(k)]["std_train_over_folds"] for k in ks])
-    test_stds   = np.array([summary["per_k"][str(k)]["std_test_over_folds"] for k in ks])
+    train_means = []
+    test_means  = []
+    train_err_low = []
+    train_err_up  = []
+    test_err_low  = []
+    test_err_up   = []
 
-    # Configurar errores para evitar valores negativos
-    train_err_low = np.minimum(train_means, train_stds)
-    train_err_high = train_stds
-    test_err_low = np.minimum(test_means, test_stds)
-    test_err_high = test_stds
+    for k in ks:
+        pk = summary["per_k"][str(k)]
+
+        # alturas de barra (ya las tenés)
+        m_tr = float(pk["mean_train_over_folds"])
+        m_te = float(pk["mean_test_over_folds"])
+        train_means.append(m_tr)
+        test_means.append(m_te)
+
+        # distribución para barras asimétricas: medias por fold
+        if "fold_train_means" in pk and "fold_test_means" in pk:
+            ftm = np.asarray(pk["fold_train_means"], dtype=float)
+            fem = np.asarray(pk["fold_test_means"], dtype=float)
+        else:
+            # fallback si viniera un json viejo
+            ftm = np.asarray([f["mse_train_mean"] for f in pk["folds"]], dtype=float)
+            fem = np.asarray([f["mse_test_mean"]  for f in pk["folds"]], dtype=float)
+
+        # percentiles 25/75 (IQR) -> barras asimétricas alrededor del mean
+        p25_tr, p75_tr = np.percentile(ftm, [25, 75])
+        p25_te, p75_te = np.percentile(fem, [25, 75])
+
+        train_err_low.append(max(0.0, m_tr - p25_tr))
+        train_err_up.append(max(0.0, p75_tr - m_tr))
+        test_err_low.append(max(0.0, m_te - p25_te))
+        test_err_up.append(max(0.0, p75_te - m_te))
+
+    train_means = np.asarray(train_means)
+    test_means  = np.asarray(test_means)
+    train_err_low = np.asarray(train_err_low)
+    train_err_up  = np.asarray(train_err_up)
+    test_err_low  = np.asarray(test_err_low)
+    test_err_up   = np.asarray(test_err_up)
 
     x = np.arange(len(ks))
     width = 0.35
 
     plt.figure(figsize=(10, 6))
     bars_tr = plt.bar(x - width/2, train_means, width, label="Train MSE",
-                      yerr=[train_err_low, train_err_high], capsize=5, 
+                      yerr=[train_err_low, train_err_up], capsize=5,
                       color="#1f77b4", alpha=0.85, error_kw={'elinewidth': 1, 'markeredgewidth': 1})
     bars_te = plt.bar(x + width/2, test_means, width, label="Test MSE",
-                      yerr=[test_err_low, test_err_high], capsize=5, 
+                      yerr=[test_err_low, test_err_up], capsize=5,
                       color="#ff7f0e", alpha=0.85, error_kw={'elinewidth': 1, 'markeredgewidth': 1})
 
     plt.xticks(x, [str(k) for k in ks])
     plt.xlabel("Cantidad de folds (K)")
     plt.ylabel("MSE (final)")
-    plt.title("MSE final promedio vs cantidad de folds")
+    plt.title("MSE final promedio vs cantidad de folds (barras = IQR)")
     plt.legend()
     plt.grid(axis='y', alpha=0.3)
 
-    # Mejorar las etiquetas de valores
+    # etiquetas
     def _add_labels(bars):
+        ymax = max( (train_means + train_err_up).max(), (test_means + test_err_up).max() )
         for b in bars:
             h = b.get_height()
-            y_pos = h + 0.1 * h
-            plt.text(b.get_x() + b.get_width()/2, y_pos,
-                     f"{h:.3f}", ha="center", va="bottom", 
-                     fontsize=9, fontweight='bold',
+            y_pos = h + 0.02 * ymax
+            plt.text(b.get_x() + b.get_width()/2, y_pos, f"{h:.3f}",
+                     ha="center", va="bottom", fontsize=9, fontweight='bold',
                      bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
+    _add_labels(bars_tr); _add_labels(bars_te)
 
-    _add_labels(bars_tr)
-    _add_labels(bars_te)
-
-    y_max = max(np.max(train_means + train_stds), np.max(test_means + test_stds))
+    y_max = max( (train_means + train_err_up).max(), (test_means + test_err_up).max() )
     plt.ylim(0, y_max * 1.15)
 
     plt.tight_layout()
     plt.savefig(outpath, dpi=150)
     plt.close()
 
+
 def plot_bar_folds_of_bestk(summary, outpath):
     best_k = summary["best_k"]
     folds = summary["per_k"][str(best_k)]["folds"]
+
     folds_idx = [f["fold"] for f in folds]
-    train_means = [f["mse_train_mean"] for f in folds]
-    test_means  = [f["mse_test_mean"] for f in folds]
+    train_means = np.array([f["mse_train_mean"] for f in folds], dtype=float)
+    test_means  = np.array([f["mse_test_mean"] for f in folds], dtype=float)
+
+    # errores asimétricos por fold usando los valores individuales guardados
+    train_err_low, train_err_up = [], []
+    test_err_low,  test_err_up  = [], []
+
+    for f, m_tr, m_te in zip(folds, train_means, test_means):
+        rtr = np.asarray(f.get("rep_train", []), dtype=float)
+        rte = np.asarray(f.get("rep_test",  []), dtype=float)
+        if rtr.size >= 2:
+            p25, p75 = np.percentile(rtr, [25, 75])
+            train_err_low.append(max(0.0, m_tr - p25))
+            train_err_up.append(max(0.0, p75 - m_tr))
+        else:
+            # fallback: std simétrica si no hay reps
+            std = float(f.get("mse_train_std", 0.0))
+            train_err_low.append(std); train_err_up.append(std)
+
+        if rte.size >= 2:
+            p25, p75 = np.percentile(rte, [25, 75])
+            test_err_low.append(max(0.0, m_te - p25))
+            test_err_up.append(max(0.0, p75 - m_te))
+        else:
+            std = float(f.get("mse_test_std", 0.0))
+            test_err_low.append(std); test_err_up.append(std)
+
+    train_err_low = np.asarray(train_err_low)
+    train_err_up  = np.asarray(train_err_up)
+    test_err_low  = np.asarray(test_err_low)
+    test_err_up   = np.asarray(test_err_up)
 
     x = np.arange(len(folds_idx))
     width = 0.35
 
     plt.figure(figsize=(10, 6))
-    bars_tr = plt.bar(x - width/2, train_means, width, label="Train MSE", color="#1f77b4", alpha=0.85)
-    bars_te = plt.bar(x + width/2, test_means, width, label="Test MSE", color="#ff7f0e", alpha=0.85)
+    bars_tr = plt.bar(x - width/2, train_means, width, label="Train MSE", color="#1f77b4", alpha=0.85,
+                      yerr=[train_err_low, train_err_up], capsize=5, error_kw={'elinewidth': 1, 'markeredgewidth': 1})
+    bars_te = plt.bar(x + width/2, test_means,  width, label="Test MSE",  color="#ff7f0e", alpha=0.85,
+                      yerr=[test_err_low,  test_err_up],  capsize=5, error_kw={'elinewidth': 1, 'markeredgewidth': 1})
     
     plt.xticks(x, [str(i) for i in folds_idx])
     plt.xlabel(f"Folds (K={best_k})")
     plt.ylabel("MSE (final)")
-    plt.title("MSE final por fold dentro del mejor K")
+    plt.title("MSE final por fold dentro del mejor K (barras = IQR)")
     plt.legend()
     plt.grid(axis='y', alpha=0.3)
 
     def _add_labels(bars):
+        ymax = max( (train_means + train_err_up).max(), (test_means + test_err_up).max() )
         for b in bars:
             h = b.get_height()
-            y_pos = h + 0.02 * max(max(train_means), max(test_means))
-            plt.text(b.get_x() + b.get_width()/2, y_pos,
-                     f"{h:.3f}", ha="center", va="bottom", 
-                     fontsize=9, fontweight='bold',
+            y_pos = h + 0.02 * ymax
+            plt.text(b.get_x() + b.get_width()/2, y_pos, f"{h:.3f}",
+                     ha="center", va="bottom", fontsize=9, fontweight='bold',
                      bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
+    _add_labels(bars_tr); _add_labels(bars_te)
 
-    _add_labels(bars_tr)
-    _add_labels(bars_te)
-
-    y_max = max(max(train_means), max(test_means))
+    y_max = max( (train_means + train_err_up).max(), (test_means + test_err_up).max() )
     plt.ylim(0, y_max * 1.15)
 
     plt.tight_layout()
     plt.savefig(outpath, dpi=150)
     plt.close()
+
+
 
 def plot_learning_curves_single_fold(curves_json, outdir, fold_name="best"):
     """

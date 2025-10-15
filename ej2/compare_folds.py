@@ -110,6 +110,8 @@ def run_study(
                 "mse_test_mean": fold_test_mean,
                 "mse_train_std": float(np.std(rep_train)),
                 "mse_test_std": float(np.std(rep_test)),
+                "rep_train": [float(x) for x in rep_train],
+                "rep_test":  [float(x) for x in rep_test],
             }
             folds_summary.append(fold_summary)
 
@@ -128,6 +130,8 @@ def run_study(
             "std_train_over_folds": float(np.std(k_train_means)),
             "std_test_over_folds": float(np.std(k_test_means)),
             "best_fold_for_k": int(best_fold_idx),
+            "fold_train_means": [float(v) for v in k_train_means],
+            "fold_test_means":  [float(v) for v in k_test_means],
         }
 
         study["per_k"][str(k)] = k_summary
