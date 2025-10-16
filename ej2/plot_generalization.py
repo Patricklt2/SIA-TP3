@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def plot_bar_k(summary, outpath):
-    ks = sorted(int(k) for k in summary["per_k"].keys() )
+    ks = sorted(int(k) for k in summary["per_k"].keys())
 
     train_means = []
     test_means  = []
@@ -15,29 +15,54 @@ def plot_bar_k(summary, outpath):
     for k in ks:
         pk = summary["per_k"][str(k)]
 
-        # alturas de barra (ya las tenés)
         m_tr = float(pk["mean_train_over_folds"])
         m_te = float(pk["mean_test_over_folds"])
         train_means.append(m_tr)
         test_means.append(m_te)
 
-        # distribución para barras asimétricas: medias por fold
         if "fold_train_means" in pk and "fold_test_means" in pk:
             ftm = np.asarray(pk["fold_train_means"], dtype=float)
             fem = np.asarray(pk["fold_test_means"], dtype=float)
         else:
-            # fallback si viniera un json viejo
             ftm = np.asarray([f["mse_train_mean"] for f in pk["folds"]], dtype=float)
             fem = np.asarray([f["mse_test_mean"]  for f in pk["folds"]], dtype=float)
 
-        # percentiles 25/75 (IQR) -> barras asimétricas alrededor del mean
-        p25_tr, p75_tr = np.percentile(ftm, [25, 75])
-        p25_te, p75_te = np.percentile(fem, [25, 75])
-
-        train_err_low.append(max(0.0, m_tr - p25_tr))
-        train_err_up.append(max(0.0, p75_tr - m_tr))
-        test_err_low.append(max(0.0, m_te - p25_te))
-        test_err_up.append(max(0.0, p75_te - m_te))
+        # Desviación estándar asimétrica
+        # SD hacia abajo: sqrt(mean((x - mean)^2 para x < mean))
+        # SD hacia arriba: sqrt(mean((x - mean)^2 para x > mean))
+        
+        # Train
+        below_mean_tr = ftm[ftm < m_tr]
+        above_mean_tr = ftm[ftm > m_tr]
+        
+        if len(below_mean_tr) > 0:
+            sd_low_tr = np.sqrt(np.mean((below_mean_tr - m_tr) ** 2))
+        else:
+            sd_low_tr = 0.0
+            
+        if len(above_mean_tr) > 0:
+            sd_up_tr = np.sqrt(np.mean((above_mean_tr - m_tr) ** 2))
+        else:
+            sd_up_tr = 0.0
+        
+        # Test
+        below_mean_te = fem[fem < m_te]
+        above_mean_te = fem[fem > m_te]
+        
+        if len(below_mean_te) > 0:
+            sd_low_te = np.sqrt(np.mean((below_mean_te - m_te) ** 2))
+        else:
+            sd_low_te = 0.0
+            
+        if len(above_mean_te) > 0:
+            sd_up_te = np.sqrt(np.mean((above_mean_te - m_te) ** 2))
+        else:
+            sd_up_te = 0.0
+        
+        train_err_low.append(sd_low_tr)
+        train_err_up.append(sd_up_tr)
+        test_err_low.append(sd_low_te)
+        test_err_up.append(sd_up_te)
 
     train_means = np.asarray(train_means)
     test_means  = np.asarray(test_means)
@@ -60,11 +85,10 @@ def plot_bar_k(summary, outpath):
     plt.xticks(x, [str(k) for k in ks])
     plt.xlabel("Cantidad de folds (K)")
     plt.ylabel("MSE (final)")
-    plt.title("MSE final promedio vs cantidad de folds (barras = IQR)")
+    plt.title("MSE final promedio vs cantidad de folds\n(barras de error = desviación estándar asimétrica)")
     plt.legend()
     plt.grid(axis='y', alpha=0.3)
 
-    # etiquetas
     def _add_labels(bars):
         ymax = max( (train_means + train_err_up).max(), (test_means + test_err_up).max() )
         for b in bars:
@@ -73,7 +97,8 @@ def plot_bar_k(summary, outpath):
             plt.text(b.get_x() + b.get_width()/2, y_pos, f"{h:.3f}",
                      ha="center", va="bottom", fontsize=9, fontweight='bold',
                      bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
-    _add_labels(bars_tr); _add_labels(bars_te)
+    _add_labels(bars_tr)
+    _add_labels(bars_te)
 
     y_max = max( (train_means + train_err_up).max(), (test_means + test_err_up).max() )
     plt.ylim(0, y_max * 1.15)
@@ -91,29 +116,56 @@ def plot_bar_folds_of_bestk(summary, outpath):
     train_means = np.array([f["mse_train_mean"] for f in folds], dtype=float)
     test_means  = np.array([f["mse_test_mean"] for f in folds], dtype=float)
 
-    # errores asimétricos por fold usando los valores individuales guardados
     train_err_low, train_err_up = [], []
     test_err_low,  test_err_up  = [], []
 
     for f, m_tr, m_te in zip(folds, train_means, test_means):
         rtr = np.asarray(f.get("rep_train", []), dtype=float)
         rte = np.asarray(f.get("rep_test",  []), dtype=float)
+        
+        # Desviación estándar asimétrica para train
         if rtr.size >= 2:
-            p25, p75 = np.percentile(rtr, [25, 75])
-            train_err_low.append(max(0.0, m_tr - p25))
-            train_err_up.append(max(0.0, p75 - m_tr))
+            below_mean_tr = rtr[rtr < m_tr]
+            above_mean_tr = rtr[rtr > m_tr]
+            
+            if len(below_mean_tr) > 0:
+                sd_low_tr = np.sqrt(np.mean((below_mean_tr - m_tr) ** 2))
+            else:
+                sd_low_tr = 0.0
+                
+            if len(above_mean_tr) > 0:
+                sd_up_tr = np.sqrt(np.mean((above_mean_tr - m_tr) ** 2))
+            else:
+                sd_up_tr = 0.0
         else:
-            # fallback: std simétrica si no hay reps
+            # Fallback a SD simétrica
             std = float(f.get("mse_train_std", 0.0))
-            train_err_low.append(std); train_err_up.append(std)
+            sd_low_tr = std
+            sd_up_tr = std
 
+        # Desviación estándar asimétrica para test
         if rte.size >= 2:
-            p25, p75 = np.percentile(rte, [25, 75])
-            test_err_low.append(max(0.0, m_te - p25))
-            test_err_up.append(max(0.0, p75 - m_te))
+            below_mean_te = rte[rte < m_te]
+            above_mean_te = rte[rte > m_te]
+            
+            if len(below_mean_te) > 0:
+                sd_low_te = np.sqrt(np.mean((below_mean_te - m_te) ** 2))
+            else:
+                sd_low_te = 0.0
+                
+            if len(above_mean_te) > 0:
+                sd_up_te = np.sqrt(np.mean((above_mean_te - m_te) ** 2))
+            else:
+                sd_up_te = 0.0
         else:
             std = float(f.get("mse_test_std", 0.0))
-            test_err_low.append(std); test_err_up.append(std)
+            sd_low_te = std
+            sd_up_te = std
+
+        train_err_low.append(sd_low_tr)
+        train_err_up.append(sd_up_tr)
+        test_err_low.append(sd_low_te)
+        test_err_up.append(sd_up_te)
 
     train_err_low = np.asarray(train_err_low)
     train_err_up  = np.asarray(train_err_up)
@@ -132,7 +184,7 @@ def plot_bar_folds_of_bestk(summary, outpath):
     plt.xticks(x, [str(i) for i in folds_idx])
     plt.xlabel(f"Folds (K={best_k})")
     plt.ylabel("MSE (final)")
-    plt.title("MSE final por fold dentro del mejor K (barras = IQR)")
+    plt.title("MSE final por fold dentro del mejor K\n(barras de error = desviación estándar asimétrica)")
     plt.legend()
     plt.grid(axis='y', alpha=0.3)
 
@@ -144,7 +196,8 @@ def plot_bar_folds_of_bestk(summary, outpath):
             plt.text(b.get_x() + b.get_width()/2, y_pos, f"{h:.3f}",
                      ha="center", va="bottom", fontsize=9, fontweight='bold',
                      bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
-    _add_labels(bars_tr); _add_labels(bars_te)
+    _add_labels(bars_tr)
+    _add_labels(bars_te)
 
     y_max = max( (train_means + train_err_up).max(), (test_means + test_err_up).max() )
     plt.ylim(0, y_max * 1.15)
