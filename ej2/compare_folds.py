@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from perceptrons.simple.perceptron import SimplePerceptron
 from ej2.utils import evaluate_real, make_kfold_indices, load_config, load_data, train_once
 
 def collect_all_folds_curves(dataset, target, k, reps, epochs, lr, activation, beta):
@@ -51,10 +50,8 @@ def collect_all_folds_curves(dataset, target, k, reps, epochs, lr, activation, b
 def run_study(
     dataset, target, k_list, reps, epochs, lr, activation, beta, verbose=False
 ):
-    data = pd.read_csv(dataset)
-    y = data[target].values.astype(float)
+    y, X = load_data(dataset, target)
     y_min, y_max = float(np.min(y)), float(np.max(y))
-    X = data[[c for c in data.columns if c != target]].values.astype(float)
     n = X.shape[0]
 
     study = {
