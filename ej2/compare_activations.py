@@ -7,9 +7,9 @@ import pandas as pd
 from ej2.utils import make_kfold_indices, ensure_dir, load_config, load_data, train_once, normalize_X
 
 # Barridos por defecto
-DEF_BETAS = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+DEF_BETAS = [0.1, 0.3, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0]
 DEF_LRS   = [1e-4, 1e-3, 1e-2, 1e-1, 1]      # tanh/sigmoid
-DEF_LRS_LINEAR = [1e-5, 1e-4, 1e-3, 1e-2]  # linear
+DEF_LRS_LINEAR = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]  # linear
 
 def parse_list(s, cast=float):
     if not s:
@@ -51,7 +51,7 @@ def phase_beta_sweep(config, results_dir, betas, reps):
     Xtr, ytr, _, _, y_min, y_max = load_split(config["dataset"], config["target"],
                                 config["kfolds"], config["test_fold"])
 
-    for act in ["tanh", "sigmoid"]:
+    for act in ["tanh"]:
         best_score = float("inf")
         best_b = None
         for beta in betas:
@@ -99,7 +99,7 @@ def phase_lr_sweep(config, results_dir, lrs, reps, best_beta):
                                 config["kfolds"], config["test_fold"])
 
     # tanh/sigmoid con β*
-    for act in ["tanh", "sigmoid"]:
+    for act in ["tanh"]:
         bstar = best_beta.get(act, None)
         if bstar is None:
             continue
@@ -168,7 +168,7 @@ def compute_bests(all_trials, config, reps):
     Xtr, ytr, _, _, y_min, y_max = load_split(config["dataset"], config["target"],
                                 config["kfolds"], config["test_fold"])
 
-    for act in ["tanh", "sigmoid", "linear"]:
+    for act in ["tanh", "linear"]:
         sub = df[df["activation"] == act]
         if sub.empty: 
             continue
@@ -230,7 +230,7 @@ def main():
     print("\n✅ Listo.")
     print(f"- ALL:   {os.path.join(args.results_dir, 'all_trials.csv')}")
     print(f"- BESTS: {bests_path}")
-    for act in ["tanh","sigmoid"]:
+    for act in ["tanh"]:
         print(f"  β* {act}: {best_beta.get(act)}")
 
 if __name__ == "__main__":
