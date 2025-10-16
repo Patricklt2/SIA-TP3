@@ -24,9 +24,13 @@ class SimplePerceptron:
         self.weights_history = []
         self._yscaler = None
 
-    def _transform_y(self, y, range_to):
+    def _transform_y(self, y, range_to, y_min=None, y_max=None):
         """Transforma y al rango especificado usando MinMax manual."""
-        y_min, y_max = y.min(), y.max()
+        if y_min is None:
+            y_min = y.min()
+        if y_max is None:
+            y_max = y.max()
+            
         a, b = range_to
         
         if np.isclose(y_min, y_max):
@@ -107,7 +111,7 @@ class SimplePerceptron:
             return (-1, 1)
         return None  # lineal -> no escalo
 
-    def train(self, training_inputs, y, epochs=1000, verbose=True, min_mse=0.0001):
+    def train(self, training_inputs, y, epochs=1000, verbose=True, min_mse=0.0001, y_min=None, y_max=None):
         """
         Entrena el perceptrón no lineal.
         """
@@ -123,7 +127,7 @@ class SimplePerceptron:
         # Escalado de y si corresponde
         rng = self._range_for_act()
         if rng is not None:
-            y_scaled, self._yscaler = self._transform_y(y_orig, rng)
+            y_scaled, self._yscaler = self._transform_y(y_orig, rng, y_min=y_min, y_max=y_max)
         else:
             self._yscaler = None
             y_scaled = y_orig

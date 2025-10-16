@@ -4,12 +4,11 @@ import numpy as np
 import pandas as pd
 
 
-from perceptrons.simple.perceptron import SimplePerceptron
 from ej2.utils import make_kfold_indices, ensure_dir, load_config, load_data, train_once
 
 # Barridos por defecto
-DEF_BETAS = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
-DEF_LRS   = [1e-4, 1e-3, 1e-2, 1e-1]      # tanh/sigmoid
+DEF_BETAS = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+DEF_LRS   = [1e-4, 1e-3, 1e-2, 1e-1, 1]      # tanh/sigmoid
 DEF_LRS_LINEAR = [1e-5, 1e-4, 1e-3, 1e-2]  # linear
 
 def parse_list(s, cast=float):

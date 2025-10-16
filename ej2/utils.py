@@ -2,7 +2,7 @@ import os, json, argparse
 import numpy as np
 import pandas as pd
 
-from perceptrons.simple.perceptron2 import SimplePerceptron
+from perceptrons.simple.perceptron import SimplePerceptron
 
 def ensure_dir(p):
     if p:
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     with open(args.config, "r") as f:
         cfg = json.load(f)
 
-    # Parámetros del JSON - CONVERTIR A LOS TIPOS CORRECTOS
+    # Parámetros del JSON 
     target = cfg.get("target", "y")
     kfolds = int(cfg.get("kfolds", 5))  # CONVERTIR A INT
     test_fold = int(cfg.get("test_fold", 1))  # CONVERTIR A INT
@@ -145,7 +145,6 @@ if __name__ == "__main__":
     reps = int(cfg.get("reps", 1))  # AÑADIR reps
     dataset = cfg.get("dataset", "ej2/TP3-ej2-conjunto.csv")
 
-    # CORREGIDO: Llamada con parámetros en el orden correcto
     try_once(
         dataset=dataset,
         kfolds=kfolds, 
