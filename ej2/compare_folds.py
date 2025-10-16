@@ -3,11 +3,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from ej2.utils import evaluate_real, make_kfold_indices, load_config, load_data, train_once
+from ej2.utils import evaluate_real, make_kfold_indices, load_config, load_data, train_once, normalize_X
 
 def collect_all_folds_curves(dataset, target, k, reps, epochs, lr, activation, beta):
     """Entrena para todos los folds y guarda curvas de todos ellos"""
     y, X = load_data(dataset, target)
+    X = normalize_X(X)
     y_min, y_max = float(np.min(y)), float(np.max(y))
     folds = make_kfold_indices(X.shape[0], k)
     
@@ -51,6 +52,7 @@ def run_study(
     dataset, target, k_list, reps, epochs, lr, activation, beta, verbose=False
 ):
     y, X = load_data(dataset, target)
+    X = normalize_X(X)
     y_min, y_max = float(np.min(y)), float(np.max(y))
     n = X.shape[0]
 

@@ -34,6 +34,13 @@ def load_config(config_path):
     
     return config
 
+def normalize_X(X):
+    Xmin = np.min(X, axis=0)
+    Xmax = np.max(X, axis=0)
+    denom = np.where((Xmax - Xmin) == 0, 1, Xmax - Xmin)
+    Xnorm = 2 * (X - Xmin) / denom - 1
+    return Xnorm
+
 def evaluate_real(y_pred, y_true):
     """Métricas en escala REAL (y_pred ya viene desescalado por el modelo)."""
     y_pred = np.asarray(y_pred).ravel()
@@ -87,6 +94,7 @@ def train_once(Xtr, ytr, epochs, lr, activation, beta, y_min=None, y_max=None):
 def try_once(dataset, kfolds, test_fold, activation, beta, lr, epochs, reps, target):
     
     y_raw, X_raw = load_data(dataset, target)
+    X_raw = normalize_X(X_raw)
     
     n_samples = X_raw.shape[0]
     folds = make_kfold_indices(n_samples, kfolds)

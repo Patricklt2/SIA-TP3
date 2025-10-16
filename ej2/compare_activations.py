@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 
-from ej2.utils import make_kfold_indices, ensure_dir, load_config, load_data, train_once
+from ej2.utils import make_kfold_indices, ensure_dir, load_config, load_data, train_once, normalize_X
 
 # Barridos por defecto
 DEF_BETAS = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
@@ -19,6 +19,7 @@ def parse_list(s, cast=float):
 def load_split(dataset, target, kfolds, test_fold):
     """Carga dataset y devuelve Xtr, ytr, Xte, yte con el fold indicado (1-indexed)."""
     y, X = load_data(dataset, target)
+    X = normalize_X(X)
     y_min, y_max = float(np.min(y)), float(np.max(y))
     folds = make_kfold_indices(X.shape[0], int(kfolds))
     tr_idx, te_idx = folds[int(test_fold) - 1]
