@@ -1,7 +1,7 @@
 {
     "dataset": "ej2/TP3-ej2-conjunto.csv",
     "target": "y",
-    "kfolds": 10,
+    "kfolds": 5,
     "test_fold": 1,
     "activation": "tanh",
     "beta": 1.0,
